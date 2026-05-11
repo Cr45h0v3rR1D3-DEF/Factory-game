@@ -1655,6 +1655,10 @@ const zombies = []; // {x,y,hp,dead,fade,attackCd}
 let coverageTiles = new Set();
 let coverageRecomputeT = 0;
 let weakSpotWorld = null; // {x, y} world pixel — used by tier 3+ as the rush point
+// One shared rally point for the whole zombie swarm. All tier-1+ zombies that have no
+// uncovered-building target head here, and the point itself migrates toward the player
+// each recompute while detouring around turret coverage. Null when there are no zombies yet.
+let swarmX = null, swarmY = null;
 
 function turretRangeFor(b) {
   if (b.type === BTYPE.TURRET) return TURRET_RANGE;
@@ -1688,6 +1692,49 @@ function recomputeCoverage() {
   }
 }
 function buildingCovered(b) { return coverageTiles.has(b.x + "," + b.y); }
+
+// Compute / migrate the global zombie swarm rally point. Called periodically (alongside coverage).
+function recomputeSwarm() {
+  // Centroid of all live zombies.
+  let sumX = 0, sumY = 0, n = 0;
+  for (const z of zombies) {
+    if (z.dead || z.hp <= 0) continue;
+    sumX += z.x; sumY += z.y; n++;
+  }
+  if (n === 0) { swarmX = null; swarmY = null; return; }
+  const cx = sumX / n, cy = sumY / n;
+  // First call (or stale after long silence): snap to centroid.
+  if (swarmX === null) { swarmX = cx; swarmY = cy; return; }
+  // Migrate the swarm point one step toward the player, avoiding turret coverage where possible.
+  // A larger step lets the rally point flow around big ranges (sniper = 60 tiles) in fewer ticks.
+  const step = TILE * 5;
+  const dx = player.x - swarmX, dy = player.y - swarmY;
+  const dist = Math.hypot(dx, dy);
+  if (dist < step) { swarmX = player.x; swarmY = player.y; return; }
+  const fwdX = dx / dist, fwdY = dy / dist;
+  // 5 candidate next positions: straight at the player, ±45°, ±90°. The covered-vs-not check
+  // dominates: if there's an uncovered candidate, we take whichever uncovered one is closest
+  // to the player; if every candidate is covered we still move straight.
+  const COS = Math.SQRT1_2; // cos 45°
+  const SIN = Math.SQRT1_2;
+  const options = [
+    { x: swarmX + fwdX * step,                       y: swarmY + fwdY * step                       },
+    { x: swarmX + (fwdX * COS - fwdY * SIN) * step,  y: swarmY + (fwdY * COS + fwdX * SIN) * step  },
+    { x: swarmX + (fwdX * COS + fwdY * SIN) * step,  y: swarmY + (fwdY * COS - fwdX * SIN) * step  },
+    { x: swarmX + (-fwdY) * step,                    y: swarmY + (fwdX) * step                    },
+    { x: swarmX + (fwdY) * step,                     y: swarmY + (-fwdX) * step                    },
+  ];
+  let best = options[0], bestScore = Infinity;
+  for (const o of options) {
+    const tx = Math.floor(o.x / TILE), ty = Math.floor(o.y / TILE);
+    const covered = coverageTiles.has(tx + "," + ty) ? 1 : 0;
+    const d2 = (player.x - o.x) ** 2 + (player.y - o.y) ** 2;
+    const score = covered * 1e10 + d2;
+    if (score < bestScore) { bestScore = score; best = o; }
+  }
+  swarmX = best.x;
+  swarmY = best.y;
+}
 
 function recomputeWeakSpot() {
   const px = Math.floor(player.x / TILE), py = Math.floor(player.y / TILE);
@@ -1730,15 +1777,10 @@ function nearestTarget(zx, zy, tier) {
       const bx = bestB.x * TILE + TILE / 2, by = bestB.y * TILE + TILE / 2;
       return { x: bx, y: by, isPlayer: false, building: bestB };
     }
-    // No uncovered building remains: group up toward the centroid of nearby zombies,
-    // unless the player is closer.
-    let sumX = 0, sumY = 0, n = 0;
-    forEachZombieInRadius(zx, zy, TILE * 12, (z2) => { sumX += z2.x; sumY += z2.y; n++; });
-    if (n > 1) {
-      const cx = sumX / n, cy = sumY / n;
-      const playerD2 = (player.x - zx) ** 2 + (player.y - zy) ** 2;
-      const groupD2 = (cx - zx) ** 2 + (cy - zy) ** 2;
-      if (groupD2 < playerD2) return { x: cx, y: cy, isPlayer: false, building: null };
+    // No uncovered building remains: join the global swarm rally point, which is itself
+    // migrating toward the player while detouring around turret coverage.
+    if (swarmX !== null) {
+      return { x: swarmX, y: swarmY, isPlayer: false, building: null };
     }
   }
   // Default (Tier 0 and the tier-1+ fallback): bee-line straight for the player.
@@ -1801,10 +1843,17 @@ function tickZombies(dt) {
       z.cachedTarget = target;
       z.targetCacheT = 800;
     }
-    // The cached target is a snapshot for buildings (still moves for the player and the weak spot).
-    if (target.isPlayer) { target = { x: player.x, y: player.y, isPlayer: true, building: null }; }
-    else if ((z.tier || 0) >= 3 && !target.building && weakSpotWorld) {
-      target = { x: weakSpotWorld.x, y: weakSpotWorld.y, isPlayer: false, building: null };
+    // The cached target is a snapshot of {x, y} for fixed-building targets, but swarm/weak-spot/
+    // player targets must read the CURRENT live coords each tick or the zombie will stop at a
+    // stale point and never catch up to the moving rally.
+    if (target.isPlayer) {
+      target = { x: player.x, y: player.y, isPlayer: true, building: null };
+    } else if (!target.building) {
+      if ((z.tier || 0) >= 3 && weakSpotWorld) {
+        target = { x: weakSpotWorld.x, y: weakSpotWorld.y, isPlayer: false, building: null };
+      } else if (swarmX !== null) {
+        target = { x: swarmX, y: swarmY, isPlayer: false, building: null };
+      }
     }
     const dx = target.x - z.x, dy = target.y - z.y;
     const dist = Math.hypot(dx, dy);
@@ -1817,22 +1866,29 @@ function tickZombies(dt) {
       let newX = z.x + vx, newY = z.y + vy;
       let tx = Math.floor(newX / TILE), ty = Math.floor(newY / TILE);
       let occ = buildingAt(tx, ty);
-      // Tier 2+ zombies sidestep walls — if blocked, try a perpendicular slide that gets them
-      // around the obstacle without attacking it. Walls only; other buildings remain attackable targets.
-      if (occ && occ.type === BTYPE.WALL && (z.tier || 0) >= 2) {
+      // Sidestep logic. Two reasons to deviate from a straight line:
+      //   • Tier 2+ : walls block our step → try a perpendicular slide around them.
+      //   • Tier 1+ : we'd be entering turret coverage from outside → slide along the edge.
+      const zTier = z.tier || 0;
+      const inCovNow = coverageTiles.has(Math.floor(z.x / TILE) + "," + Math.floor(z.y / TILE));
+      const enteringCov = coverageTiles.has(tx + "," + ty) && !inCovNow;
+      const blockingWall = occ && occ.type === BTYPE.WALL;
+      const wantSidestep = (blockingWall && zTier >= 2) || (enteringCov && zTier >= 1);
+      if (wantSidestep) {
         const perpAx = -vy, perpAy = vx;   // 90° CCW
         const perpBx =  vy, perpBy = -vx;  // 90° CW
         const tryCandidate = (px, py) => {
           const cx = z.x + px, cy = z.y + py;
           const ctx = Math.floor(cx / TILE), cty = Math.floor(cy / TILE);
           const c = buildingAt(ctx, cty);
-          return (!c || c === target.building) ? { x: cx, y: cy } : null;
+          if (c && c.type === BTYPE.WALL && c !== target.building) return null;
+          if (enteringCov && coverageTiles.has(ctx + "," + cty)) return null;
+          return { x: cx, y: cy };
         };
         const tryA = tryCandidate(perpAx, perpAy);
         const tryB = tryCandidate(perpBx, perpBy);
         let pick = null;
         if (tryA && tryB) {
-          // pick the side that gets us closer to the target
           const dA = (tryA.x - target.x) ** 2 + (tryA.y - target.y) ** 2;
           const dB = (tryB.x - target.x) ** 2 + (tryB.y - target.y) ** 2;
           pick = dA < dB ? tryA : tryB;
@@ -3972,6 +4028,7 @@ function update(dt) {
   if (coverageRecomputeT <= 0) {
     recomputeCoverage();
     recomputeWeakSpot();
+    recomputeSwarm();
     coverageRecomputeT = COVERAGE_RECOMPUTE_INTERVAL;
   }
   // Order: artillery → sniper → heavy → normal. Earlier turrets reduce z.hp first, and the
