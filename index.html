@@ -1,0 +1,4048 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Factory Defense</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #1a1a1a; height: 100%; overflow: hidden; }
+  body { display: flex; align-items: center; justify-content: center; font-family: ui-monospace, "Cascadia Mono", "Consolas", monospace; }
+  #game { display: block; background: #2d3a2d; image-rendering: pixelated; cursor: crosshair;
+          width: min(100vw, calc(100vh * 3 / 2));
+          height: min(100vh, calc(100vw * 2 / 3)); }
+  #overlay { position: fixed; inset: 0; pointer-events: none; display: flex; align-items: center; justify-content: center; }
+  #overlay .panel { pointer-events: auto; background: rgba(0,0,0,0.75); color: #fff; padding: 24px 32px; border: 2px solid #ffd700; text-align: center; font-size: 18px; }
+  #overlay button { margin-top: 16px; padding: 8px 16px; font-family: inherit; font-size: 16px; background: #ffd700; color: #000; border: none; cursor: pointer; }
+  #overlay button:hover { background: #ffea66; }
+  #hud { position: fixed; top: 12px; left: 12px; pointer-events: none; color: #ffd700;
+         font-family: ui-monospace, Consolas, monospace; text-shadow: 0 0 3px #000, 0 0 3px #000; }
+  #hud .wave { background: rgba(0,0,0,0.7); border: 2px solid #ffd700; padding: 8px 14px;
+               font-size: 24px; font-weight: bold; min-width: 220px; }
+  #hud .wave .sub { display: block; font-size: 13px; color: #fff; font-weight: normal; margin-top: 4px; }
+  #hud .hp { margin-top: 8px; width: 240px; height: 20px; background: #400; border: 1px solid #000;
+             position: relative; overflow: hidden; }
+  #hud .hp .fill { background: #d22; height: 100%; transition: width 0.1s; }
+  #hud .hp .label { position: absolute; left: 6px; top: 2px; color: #fff; font-size: 12px; }
+  #hud .skip { margin-top: 8px; width: 244px; padding: 6px 0; pointer-events: auto; cursor: pointer;
+               background: #ffd700; color: #000; border: 2px solid #000; font-family: inherit;
+               font-size: 14px; font-weight: bold; text-align: center; }
+  #hud .skip:hover:not(:disabled) { background: #ffea66; }
+  #hud .skip:disabled { background: #555; color: #888; cursor: not-allowed; }
+  #hud .train { margin-top: 6px; color: #ffd700; font-size: 12px; background: rgba(0,0,0,0.55); padding: 4px 6px; }
+  #scheduleModal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+                   background: rgba(0,0,0,0.65); z-index: 100; }
+  #scheduleModal.open { display: flex; }
+  #scheduleModal .panel { background: #1a1a1a; border: 2px solid #ffd700; padding: 18px 22px;
+                          color: #fff; font-family: ui-monospace, Consolas, monospace; min-width: 380px; }
+  #scheduleModal h3 { margin: 0 0 12px 0; color: #ffd700; }
+  #scheduleModal .row { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
+  #scheduleModal label { width: 60px; }
+  #scheduleModal select { background: #2a2a2a; color: #fff; border: 1px solid #555; padding: 4px; font-family: inherit; }
+  #scheduleModal .actions { margin-top: 12px; display: flex; gap: 8px; justify-content: flex-end; }
+  #scheduleModal button { padding: 6px 14px; background: #ffd700; color: #000; border: none; cursor: pointer; font-family: inherit; font-weight: bold; }
+  #scheduleModal button.secondary { background: #555; color: #fff; }
+  #blueprintModal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+                    background: rgba(0,0,0,0.65); z-index: 100; }
+  #blueprintModal.open { display: flex; }
+  #blueprintModal .panel { background: #1a1a1a; border: 2px solid #ffd700; padding: 18px 22px;
+                            color: #fff; font-family: ui-monospace, Consolas, monospace; min-width: 360px;
+                            max-width: 480px; }
+  #blueprintModal h3 { margin: 0 0 12px 0; color: #ffd700; }
+  #blueprintList { list-style: none; padding: 0; margin: 0 0 12px 0; max-height: 280px; overflow-y: auto; }
+  #blueprintList li { display: flex; gap: 6px; margin: 4px 0; }
+  #blueprintList li button.bpName { flex: 1; text-align: left; padding: 6px 10px; background: #2a2a2a;
+                                    color: #fff; border: 1px solid #555; cursor: pointer;
+                                    font-family: inherit; }
+  #blueprintList li button.bpName:hover { background: #3a3a3a; }
+  #blueprintList li button.bpDel { padding: 6px 10px; background: #5a2424; color: #fff; border: none;
+                                    cursor: pointer; font-family: inherit; }
+  #blueprintList li button.bpDel:hover { background: #7a3030; }
+  #blueprintList .empty { color: #888; padding: 4px 0; }
+  #blueprintModal .actions { display: flex; gap: 8px; justify-content: flex-end; }
+  #blueprintModal button { padding: 6px 14px; background: #ffd700; color: #000; border: none; cursor: pointer; font-family: inherit; font-weight: bold; }
+  #blueprintModal button.secondary { background: #555; color: #fff; }
+</style>
+</head>
+<body>
+<canvas id="game" width="1440" height="960" tabindex="0"></canvas>
+<div id="hud">
+  <div class="wave">WAVE <span id="hudWaveNum">0</span><span class="sub" id="hudWaveSub">Next in 30s</span></div>
+  <div class="hp"><div class="fill" id="hudHpFill" style="width:100%"></div><span class="label" id="hudHpLabel">HP 100/100</span></div>
+  <button class="skip" id="hudSkipBtn" type="button">Start next wave</button>
+  <div class="train" id="hudTrain" style="display:none">Train: —</div>
+</div>
+<div id="scheduleModal">
+  <div class="panel">
+    <h3>Train Schedule</h3>
+    <div class="row">
+      <label>Stop 1</label>
+      <select id="schStop1Station"></select>
+      <select id="schStop1Cond"><option value="full">until full</option><option value="empty">until empty</option></select>
+    </div>
+    <div class="row">
+      <label>Stop 2</label>
+      <select id="schStop2Station"></select>
+      <select id="schStop2Cond"><option value="full">until full</option><option value="empty">until empty</option></select>
+    </div>
+    <div class="actions">
+      <button class="secondary" id="schCloseBtn" type="button">Close</button>
+      <button id="schSaveBtn" type="button">Save</button>
+    </div>
+  </div>
+</div>
+<div id="blueprintModal">
+  <div class="panel">
+    <h3>Blueprints</h3>
+    <ul id="blueprintList"></ul>
+    <div class="actions">
+      <button class="secondary" id="bpCloseBtn" type="button">Close</button>
+      <button id="bpCreateBtn" type="button">Create new</button>
+    </div>
+  </div>
+</div>
+<div id="overlay"></div>
+<script>
+"use strict";
+
+// ============================================================
+// Constants
+// ============================================================
+const TILE = 24;
+const WORLD_MAX_COLS = 2000;
+const WORLD_MAX_ROWS = 1500;
+const INITIAL_COLS = 120;
+const INITIAL_ROWS = 80;
+const WORLD_GROW_PER_WAVE = 4; // tiles added on each side per wave
+const ORE_PATCHES_PER_WAVE = 1;
+const VIEW_W = 1440;
+const VIEW_H = 960;
+// Active region bounds in tile coords (mutable). Tiles outside are unrenderable/unwalkable.
+let xMin, yMin, xMax, yMax;
+let W = 0, H = 0; // active region in pixels — recomputed on bounds change
+function recomputeWH() { W = (xMax - xMin) * TILE; H = (yMax - yMin) * TILE; }
+function setInitialActiveBounds() {
+  xMin = Math.floor((WORLD_MAX_COLS - INITIAL_COLS) / 2);
+  yMin = Math.floor((WORLD_MAX_ROWS - INITIAL_ROWS) / 2);
+  xMax = xMin + INITIAL_COLS;
+  yMax = yMin + INITIAL_ROWS;
+  recomputeWH();
+}
+setInitialActiveBounds();
+const FIXED_DT = 1000 / 60; // 16.67ms
+
+const DIR = { UP:0, RIGHT:1, DOWN:2, LEFT:3 };
+const DX = [0, 1, 0, -1];
+const DY = [-1, 0, 1, 0];
+const DIR_RAD = [-Math.PI/2, 0, Math.PI/2, Math.PI];
+
+const BTYPE = { MINER:1, BELT:2, ASSEMBLER:3, TURRET:4, WALL:5, SPLITTER:6, HEAVY_TURRET:7, UNDERGROUND_BELT:8, SNIPER_TURRET:9, RAIL:10, STATION:11, ARTILLERY:12, HEAVY_ASSEMBLER:13, BIG_DRILL:14 };
+const BIG_DRILL_UNLOCK_WAVE = 100;
+const BIG_DRILL_INTERVAL = 1000 / 9;     // 9 normal miners' worth of mining throughput
+const BIG_DRILL_RANGE = 1;               // tiles beyond the 3x3 footprint → 5x5 total scan area
+const HEAVY_ASSEMBLER_INTERVAL = 2500;
+const HEAVY_ASSEMBLER_HEAVY_BUF_MAX = 12;
+const HEAVY_ASSEMBLER_ORE_BUF_MAX = 60;
+const RAIL_UNLOCK_WAVE = 25;
+const TRAIN_INVENTORY_MAX = 250;
+const STATION_W = 1;
+const STATION_L = 10;
+const LOCOMOTIVE_L = 5;
+const STORAGE_L = 5;
+const TRAIN_SPEED = 4 * TILE / 1000; // px per ms
+const CAR_W_PX = 18;       // rendered car body width
+const WHEEL_R = 3.5;
+const COUPLING_GAP = 0.4;  // tile units between locomotive back wheel and storage car front wheel
+const TRAIN_OUTPUT_INTERVAL = 100; // ms between unload transfers
+const MAX_STATIONS = 2;
+const SNIPER_TURRET_UNLOCK_WAVE = 10;
+const SNIPER_TURRET_RANGE = 12 * TILE * 5; // 5x normal turret
+const SNIPER_TURRET_INTERVAL = 1000;
+const SNIPER_TURRET_DMG = 9999; // one-shot
+const SNIPER_TURRET_AMMO_MAX = 2; // heavy ammo items
+const SNIPER_RECOIL_MS = 180;
+// Turret turning speed (radians per ms). Bigger guns turn slower.
+const TURRET_TURN_RATE = 0.008;
+const HEAVY_TURRET_TURN_RATE = 0.005;
+const SNIPER_TURRET_TURN_RATE = 0.002;
+const ARTILLERY_TURN_RATE = 0.0008;
+const TURRET_AIM_TOLERANCE = 0.08; // radians; barrel must be within this of the target to fire
+// Artillery turret (3x3, fires SHELL projectiles).
+const ARTILLERY_UNLOCK_WAVE = 30;
+const ARTILLERY_RANGE = 225 * TILE;
+const ARTILLERY_MIN_RANGE = 25 * TILE;
+const ARTILLERY_INTERVAL = 4000;       // 4 s between shells
+const ARTILLERY_SHELL_BUF_MAX = 5;     // shells stored in the artillery
+const ARTILLERY_SHELL_SPEED = 30 * TILE / 1000; // 30 tiles / sec
+const ARTILLERY_BLAST_RADIUS = 5 * TILE;        // 10-tile-wide explosion (radius 5)
+// Shell crafting at the assembler.
+const SHELL_HEAVY_COST = 2;
+const SHELL_ORE_COST = 10;
+const ASSEMBLER_HEAVY_BUF_MAX = 12;
+const UNDERGROUND_BELT_RANGE = 5;
+const ITEM = { ORE:1, AMMO:2, HEAVY_AMMO:3, SHELL:4 };
+const HEAVY_TURRET_UNLOCK_WAVE = 10;
+const HEAVY_TURRET_AMMO_MAX = 50;
+const HEAVY_TURRET_INTERVAL = 100; // 10 bullets/sec sustained
+const HEAVY_TURRET_DMG_PER_BULLET = 12; // ~0.5x normal turret's 25
+const HEAVY_AMMO_PER_HEAVY_TURRET = 10;
+const HEAVY_AMMO_PER_NORMAL_TURRET = 4;
+
+const PLAYER_SPEED = 4 * TILE / 1000; // tiles/sec → px/ms
+const PLAYER_MAX_HP = 100;
+const ZOMBIE_SPEED = 1.5 * TILE / 1000;
+const ZOMBIE_HP = 50;
+const ZOMBIE_DMG_PER_SEC = 10;
+const PLAYER_DMG_PER_SEC = 10;
+// Player handgun (Space to fire toward the mouse cursor).
+const PLAYER_GUN_RELOAD = 2500;                       // ms between shots
+const PLAYER_BULLET_SPEED = 50 * TILE / 1000;         // 50 tiles / sec
+const PLAYER_BULLET_RANGE = 20 * TILE;                // tiles before despawn
+const PLAYER_BULLET_DMG = 50;                          // 1-shots a fresh zombie
+const WALL_HP = 200;
+
+const MINER_INTERVAL = 1000;
+const BELT_INTERVAL = 500;
+const ASSEMBLER_INTERVAL = 2000;
+const TURRET_INTERVAL = 800;
+const TURRET_RANGE = 12 * TILE;
+const TURRET_DMG = 25;
+const TURRET_AMMO_MAX = 20;
+
+const WAVE_FIRST_DELAY = 120000; // 2 minute grace period
+const WAVE_INTERVAL = 60000;
+const WAVE_SPAWN_WINDOW = 10000;
+
+// Palette
+const COL = {
+  ground: "#2d3a2d",
+  oreTile: "#6b7d8f",
+  oreDot: "#9aa9b8",
+  player: "#f4e4bc",
+  playerOutline: "#7a6940",
+  miner: "#8b6f47",
+  belt: "#4a4a4a",
+  beltArrow: "#ffd700",
+  assembler: "#a0522d",
+  turret: "#555555",
+  wall: "#888888",
+  ore: "#c0c0c0",
+  ammo: "#ffcc00",
+  zombie: "#4a7c4a",
+  zombieEye: "#1a2f1a",
+  bullet: "#ffffff",
+  shadow: "rgba(0,0,0,0.35)",
+  grid: "#26312a",
+  selected: "#ffd700",
+  hpBack: "#400",
+  hpFill: "#d22",
+};
+
+// ============================================================
+// Input
+// ============================================================
+const keys = {};
+let mouseX = 0, mouseY = 0; // world coords
+let mouseScreenX = 0, mouseScreenY = 0; // canvas coords
+let mouseTileX = 0, mouseTileY = 0;
+let camX = 0, camY = 0;
+let leftClickQueued = false;
+let rightClickQueued = false;
+let placementDir = DIR.RIGHT;
+let selectedBuilding = BTYPE.MINER;
+let paused = false;
+let gameOver = false;
+let showMap = false;
+let pendingConfirm = null; // null | "save" | "load" | "newworld"
+let railToolStart = null; // { x, y } first-click tile when laying rail
+let scheduleModalOpen = false;
+let loadingBuildings = false; // bypasses placement-time validations during loadGame
+// Blueprint state
+let blueprints = [];               // [{ name, items: [{ t, dx, dy, dir }] }]
+let blueprintModalOpen = false;
+let blueprintCapture = null;       // { name, start: {x,y}|null }
+let blueprintPlace = null;         // a blueprint object the player is placing
+// Full-map pan/zoom state (only used when showMap is true).
+let mapView = { centerX: 0, centerY: 0, zoom: 1 };
+let mapDrag = null; // { lastScreenX, lastScreenY }
+let bigMapRect = null; // { x, y, w, h } in canvas pixels — set each frame the map is drawn
+let worldGenOpen = false;
+const worldGenSettings = { count: 8, inset: 12, gap: 4 };
+let worldGenPreview = null; // 2D array of ore counts
+
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+ctx.imageSmoothingEnabled = false;
+
+window.addEventListener("keydown", (e) => {
+  if (gameOver) return;
+  const k = e.key.toLowerCase();
+  keys[k] = true;
+  // Confirm dialog intercepts input while open
+  if (pendingConfirm) {
+    if (k === "y" || k === "enter") {
+      if (pendingConfirm === "save") saveGame();
+      else if (pendingConfirm === "load") loadGame();
+      else if (pendingConfirm === "newworld") { applyNewWorld(); worldGenOpen = false; worldGenPreview = null; }
+      pendingConfirm = null;
+    } else if (k === "n" || k === "escape") {
+      pendingConfirm = null;
+    }
+    return;
+  }
+  // World-gen dialog intercepts input while open
+  if (worldGenOpen) {
+    if (k === "escape") { worldGenOpen = false; worldGenPreview = null; }
+    else if (k === "=" || k === "+") { worldGenSettings.count = Math.min(30, worldGenSettings.count + 1); regenWorldPreview(); }
+    else if (k === "-" || k === "_") { worldGenSettings.count = Math.max(1, worldGenSettings.count - 1); regenWorldPreview(); }
+    else if (k === "]") { worldGenSettings.inset = Math.min(30, worldGenSettings.inset + 1); regenWorldPreview(); }
+    else if (k === "[") { worldGenSettings.inset = Math.max(0, worldGenSettings.inset - 1); regenWorldPreview(); }
+    else if (k === ".") { worldGenSettings.gap = Math.min(15, worldGenSettings.gap + 1); regenWorldPreview(); }
+    else if (k === ",") { worldGenSettings.gap = Math.max(0, worldGenSettings.gap - 1); regenWorldPreview(); }
+    else if (k === " " || k === "spacebar") { regenWorldPreview(); }
+    else if (k === "enter") { pendingConfirm = "newworld"; }
+    return;
+  }
+  if (k === "1") selectedBuilding = BTYPE.MINER;
+  else if (k === "2") selectedBuilding = BTYPE.BELT;
+  else if (k === "3") selectedBuilding = BTYPE.ASSEMBLER;
+  else if (k === "4") selectedBuilding = BTYPE.TURRET;
+  else if (k === "5") selectedBuilding = BTYPE.WALL;
+  else if (k === "6") selectedBuilding = BTYPE.SPLITTER;
+  else if (k === "7") { if (waveState.waveNumber >= HEAVY_TURRET_UNLOCK_WAVE) selectedBuilding = BTYPE.HEAVY_TURRET; else showToast("Heavy turret unlocks at wave " + HEAVY_TURRET_UNLOCK_WAVE); }
+  else if (k === "8") selectedBuilding = BTYPE.UNDERGROUND_BELT;
+  else if (k === "9") { if (waveState.waveNumber >= SNIPER_TURRET_UNLOCK_WAVE) selectedBuilding = BTYPE.SNIPER_TURRET; else showToast("Sniper turret unlocks at wave " + SNIPER_TURRET_UNLOCK_WAVE); }
+  else if (k === "0") { if (waveState.waveNumber >= RAIL_UNLOCK_WAVE) { selectedBuilding = BTYPE.RAIL; railToolStart = null; } else showToast("Railway unlocks at wave " + RAIL_UNLOCK_WAVE); }
+  else if (k === "-") { if (waveState.waveNumber >= RAIL_UNLOCK_WAVE) selectedBuilding = BTYPE.STATION; else showToast("Railway unlocks at wave " + RAIL_UNLOCK_WAVE); }
+  else if (k === "=") { if (waveState.waveNumber >= ARTILLERY_UNLOCK_WAVE) selectedBuilding = BTYPE.ARTILLERY; else showToast("Artillery unlocks at wave " + ARTILLERY_UNLOCK_WAVE); }
+  else if (k === "[") { if (waveState.waveNumber >= ARTILLERY_UNLOCK_WAVE) selectedBuilding = BTYPE.HEAVY_ASSEMBLER; else showToast("Heavy assembler unlocks at wave " + ARTILLERY_UNLOCK_WAVE); }
+  else if (k === "]") { if (waveState.waveNumber >= BIG_DRILL_UNLOCK_WAVE) selectedBuilding = BTYPE.BIG_DRILL; else showToast("Big drill unlocks at wave " + BIG_DRILL_UNLOCK_WAVE); }
+  else if (k === "r") placementDir = (placementDir + 1) % 4;
+  else if (k === "escape") paused = !paused;
+  else if (k === "f") pendingConfirm = "save";
+  else if (k === "l") pendingConfirm = "load";
+  else if (k === "m") {
+    showMap = !showMap;
+    if (showMap) {
+      // Reset view to player-centered, zoom 1 (whole active region fits).
+      mapView.centerX = (xMin + xMax) / 2;
+      mapView.centerY = (yMin + yMax) / 2;
+      mapView.zoom = 1;
+    }
+  }
+  else if (k === "g") { worldGenOpen = true; regenWorldPreview(); }
+  else if (k === " " || k === "spacebar") { e.preventDefault(); firePlayerGun(); }
+  else if (k === "b") {
+    // B cancels any in-progress capture/place; otherwise opens the blueprint list.
+    if (blueprintPlace) { blueprintPlace = null; showToast("Cancelled"); }
+    else if (blueprintCapture) { blueprintCapture = null; showToast("Capture cancelled"); }
+    else openBlueprintModal();
+  }
+});
+window.addEventListener("keyup", (e) => { keys[e.key.toLowerCase()] = false; });
+
+canvas.addEventListener("mousemove", (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const sx = canvas.width / rect.width;
+  const sy = canvas.height / rect.height;
+  const newScreenX = (e.clientX - rect.left) * sx;
+  const newScreenY = (e.clientY - rect.top) * sy;
+  // Map pan: convert screen-pixel delta to tile delta and shift center.
+  if (mapDrag && bigMapRect) {
+    const dxPx = newScreenX - mapDrag.lastScreenX;
+    const dyPx = newScreenY - mapDrag.lastScreenY;
+    const b = computeFullMapBounds();
+    const tilesPerMapPxX = (b.xMax - b.xMin) / bigMapRect.w;
+    const tilesPerMapPxY = (b.yMax - b.yMin) / bigMapRect.h;
+    mapView.centerX -= dxPx * tilesPerMapPxX;
+    mapView.centerY -= dyPx * tilesPerMapPxY;
+    mapDrag.lastScreenX = newScreenX;
+    mapDrag.lastScreenY = newScreenY;
+  }
+  mouseScreenX = newScreenX;
+  mouseScreenY = newScreenY;
+  mouseX = mouseScreenX + camX;
+  mouseY = mouseScreenY + camY;
+  mouseTileX = Math.floor(mouseX / TILE);
+  mouseTileY = Math.floor(mouseY / TILE);
+});
+let rightHeld = false;
+let leftHeld = false;
+
+function pointInRect(x, y, r) {
+  return r && x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
+}
+
+// Returns the visible tile-coord rect of the full map at current pan/zoom.
+function computeFullMapBounds() {
+  const aW = (xMax - xMin), aH = (yMax - yMin);
+  const visW = aW / mapView.zoom;
+  const visH = aH / mapView.zoom;
+  return {
+    xMin: mapView.centerX - visW / 2,
+    yMin: mapView.centerY - visH / 2,
+    xMax: mapView.centerX + visW / 2,
+    yMax: mapView.centerY + visH / 2,
+  };
+}
+
+canvas.addEventListener("mousedown", (e) => {
+  if (gameOver || paused) return;
+  if (scheduleModalOpen) return;
+  // Map drag intercepts left-click while M overlay is open and the cursor is over the map.
+  if (showMap && e.button === 0 && pointInRect(mouseScreenX, mouseScreenY, bigMapRect)) {
+    mapDrag = { lastScreenX: mouseScreenX, lastScreenY: mouseScreenY };
+    return;
+  }
+  if (showMap) return; // ignore world clicks while map is open
+  if (e.button === 0) { leftClickQueued = true; leftHeld = true; }
+  else if (e.button === 2) { rightClickQueued = true; rightHeld = true; }
+});
+window.addEventListener("mouseup", (e) => {
+  if (e.button === 2) rightHeld = false;
+  if (e.button === 0) { mapDrag = null; leftHeld = false; }
+});
+
+function isSlotLocked(type) {
+  if (type === BTYPE.HEAVY_TURRET && waveState.waveNumber < HEAVY_TURRET_UNLOCK_WAVE) return true;
+  if (type === BTYPE.SNIPER_TURRET && waveState.waveNumber < SNIPER_TURRET_UNLOCK_WAVE) return true;
+  if ((type === BTYPE.RAIL || type === BTYPE.STATION) && waveState.waveNumber < RAIL_UNLOCK_WAVE) return true;
+  if ((type === BTYPE.ARTILLERY || type === BTYPE.HEAVY_ASSEMBLER) && waveState.waveNumber < ARTILLERY_UNLOCK_WAVE) return true;
+  if (type === BTYPE.BIG_DRILL && waveState.waveNumber < BIG_DRILL_UNLOCK_WAVE) return true;
+  return false;
+}
+
+canvas.addEventListener("wheel", (e) => {
+  // Zoom the map if it's open and the cursor is over it.
+  if (showMap && pointInRect(mouseScreenX, mouseScreenY, bigMapRect)) {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.25 : 1 / 1.25;
+    const oldB = computeFullMapBounds();
+    const oldW = oldB.xMax - oldB.xMin, oldH = oldB.yMax - oldB.yMin;
+    const u = (mouseScreenX - bigMapRect.x) / bigMapRect.w;
+    const v = (mouseScreenY - bigMapRect.y) / bigMapRect.h;
+    const tileAtCursorX = oldB.xMin + u * oldW;
+    const tileAtCursorY = oldB.yMin + v * oldH;
+    mapView.zoom = Math.max(0.25, Math.min(8, mapView.zoom * factor));
+    const newW = oldW / factor, newH = oldH / factor;
+    mapView.centerX = tileAtCursorX - (u - 0.5) * newW;
+    mapView.centerY = tileAtCursorY - (v - 0.5) * newH;
+    return;
+  }
+  if (scheduleModalOpen || pendingConfirm || worldGenOpen) return;
+  // Otherwise: cycle the hotbar selection. Skip locked slots.
+  e.preventDefault();
+  const slots = 14;
+  const dir = e.deltaY > 0 ? 1 : -1;
+  let next = selectedBuilding;
+  for (let i = 0; i < slots; i++) {
+    next += dir;
+    if (next < 1) next = slots;
+    if (next > slots) next = 1;
+    if (!isSlotLocked(next)) break;
+  }
+  selectedBuilding = next;
+}, { passive: false });
+canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+
+// ============================================================
+// World
+// ============================================================
+// Ore storage: flat Uint16Array, 2 bytes per tile (max ore 500 fits easily). Massively cheaper
+// than millions of {ore:0} objects, which lets us pre-allocate a much bigger world buffer
+// so the world can keep growing well past wave 100.
+const ore = new Uint16Array(WORLD_MAX_COLS * WORLD_MAX_ROWS);
+function oreIdx(x, y) { return y * WORLD_MAX_COLS + x; }
+function oreAt(x, y) { return ore[y * WORLD_MAX_COLS + x]; }
+function setOre(x, y, v) { ore[y * WORLD_MAX_COLS + x] = v; }
+function clearAllOre() { ore.fill(0); }
+
+function inBounds(x, y) { return x >= xMin && y >= yMin && x < xMax && y < yMax; }
+
+const ORE_PATCH_COUNT = 8;
+const ORE_EDGE_INSET = 12;
+const ORE_PATCH_GAP = 4;
+
+// Generates an ore-count grid (sized as the full WORLD buffer) using the given settings.
+// Generates patches strictly inside the active region (xMin..xMax, yMin..yMax) inset by settings.inset.
+function getInitialBounds() {
+  const x0 = Math.floor((WORLD_MAX_COLS - INITIAL_COLS) / 2);
+  const y0 = Math.floor((WORLD_MAX_ROWS - INITIAL_ROWS) / 2);
+  return { xMin: x0, yMin: y0, xMax: x0 + INITIAL_COLS, yMax: y0 + INITIAL_ROWS };
+}
+
+function genOreGrid(settings, bounds) {
+  const b = bounds || { xMin, yMin, xMax, yMax };
+  // Use a flat Uint16Array indexed [y*WORLD_MAX_COLS + x]; matches the live `ore` buffer layout
+  // so we can blit it in with `ore.set(grid)`.
+  const grid = new Uint16Array(WORLD_MAX_COLS * WORLD_MAX_ROWS);
+  let placed = 0, attempts = 0;
+  const maxAttempts = 6000;
+  while (placed < settings.count && attempts < maxAttempts) {
+    attempts++;
+    const w = 3 + Math.floor(Math.random() * 3);
+    const h = 3 + Math.floor(Math.random() * 3);
+    const minX = b.xMin + settings.inset;
+    const maxX = b.xMax - settings.inset - w;
+    const minY = b.yMin + settings.inset;
+    const maxY = b.yMax - settings.inset - h;
+    if (maxX < minX || maxY < minY) break;
+    const x = minX + Math.floor(Math.random() * (maxX - minX + 1));
+    const y = minY + Math.floor(Math.random() * (maxY - minY + 1));
+    const cx = (b.xMin + b.xMax) / 2, cy = (b.yMin + b.yMax) / 2;
+    if (Math.abs(x + w/2 - cx) < 6 && Math.abs(y + h/2 - cy) < 6) continue;
+    let empty = true;
+    for (let dy = -settings.gap; dy < h + settings.gap && empty; dy++) {
+      for (let dx = -settings.gap; dx < w + settings.gap; dx++) {
+        const tx = x + dx, ty = y + dy;
+        if (tx < 0 || ty < 0 || tx >= WORLD_MAX_COLS || ty >= WORLD_MAX_ROWS) continue;
+        if (grid[ty * WORLD_MAX_COLS + tx] > 0) { empty = false; break; }
+      }
+    }
+    if (!empty) continue;
+    for (let dy = 0; dy < h; dy++) for (let dx = 0; dx < w; dx++) {
+      grid[(y+dy) * WORLD_MAX_COLS + (x+dx)] = 500;
+    }
+    placed++;
+  }
+  return { grid, placed };
+}
+
+function generateOrePatches() {
+  const result = genOreGrid({ count: ORE_PATCH_COUNT, inset: ORE_EDGE_INSET, gap: ORE_PATCH_GAP });
+  ore.set(result.grid);
+}
+
+// Place `count` ore patches in the freshly-revealed ring (newly added tiles outside prevB but inside newB),
+// respecting a buffer against existing ore and avoiding occupied building tiles.
+function growOreInRing(prevB, count, sizeMin, sizeMax) {
+  const gap = ORE_PATCH_GAP;
+  const lo = sizeMin || 3;
+  const hi = sizeMax || 5;
+  let placed = 0, attempts = 0;
+  while (placed < count && attempts < 4000) {
+    attempts++;
+    const w = lo + Math.floor(Math.random() * (hi - lo + 1));
+    const h = lo + Math.floor(Math.random() * (hi - lo + 1));
+    const minX = xMin + 2;
+    const maxX = xMax - 2 - w;
+    const minY = yMin + 2;
+    const maxY = yMax - 2 - h;
+    if (maxX < minX || maxY < minY) break;
+    const x = minX + Math.floor(Math.random() * (maxX - minX + 1));
+    const y = minY + Math.floor(Math.random() * (maxY - minY + 1));
+    // Require at least one tile of the patch to lie OUTSIDE the previous active region.
+    let inRing = false;
+    for (let dy = 0; dy < h && !inRing; dy++) for (let dx = 0; dx < w; dx++) {
+      const tx = x + dx, ty = y + dy;
+      if (tx < prevB.xMin || tx >= prevB.xMax || ty < prevB.yMin || ty >= prevB.yMax) { inRing = true; break; }
+    }
+    if (!inRing) continue;
+    let empty = true;
+    for (let dy = -gap; dy < h + gap && empty; dy++) {
+      for (let dx = -gap; dx < w + gap; dx++) {
+        const tx = x + dx, ty = y + dy;
+        if (tx < 0 || ty < 0 || tx >= WORLD_MAX_COLS || ty >= WORLD_MAX_ROWS) continue;
+        if (oreAt(tx, ty) > 0) { empty = false; break; }
+      }
+    }
+    if (!empty) continue;
+    let blocked = false;
+    for (let dy = 0; dy < h && !blocked; dy++) for (let dx = 0; dx < w; dx++) {
+      if (buildingAt(x+dx, y+dy)) { blocked = true; break; }
+    }
+    if (blocked) continue;
+    for (let dy = 0; dy < h; dy++) for (let dx = 0; dx < w; dx++) setOre(x+dx, y+dy, 500);
+    placed++;
+  }
+  return placed;
+}
+
+function growWorld() {
+  // Growth phases:
+  //   waves 1-15  : grow by 4 each side, 1 small patch each wave
+  //   waves 16-99 : frozen
+  //   waves 100+  : grow by 10 each side, 1 patch every 2 waves, patches grow up to 10x10
+  const w = waveState.waveNumber;
+  const earlyPhase = (w >= 1 && w <= 15);
+  const latePhase = (w >= 100);
+  if (!earlyPhase && !latePhase) return;
+  const step = latePhase ? 10 : WORLD_GROW_PER_WAVE;
+  const prev = { xMin, yMin, xMax, yMax };
+  xMin = Math.max(0, xMin - step);
+  yMin = Math.max(0, yMin - step);
+  xMax = Math.min(WORLD_MAX_COLS, xMax + step);
+  yMax = Math.min(WORLD_MAX_ROWS, yMax + step);
+  recomputeWH();
+  const grew = (xMin !== prev.xMin || yMin !== prev.yMin || xMax !== prev.xMax || yMax !== prev.yMax);
+  if (!grew) return;
+  if (earlyPhase) {
+    growOreInRing(prev, ORE_PATCHES_PER_WAVE);
+  } else {
+    // Late phase: spawn a patch every other wave (only on even-numbered waves >= 100).
+    if (w % 2 !== 0) return;
+    // Patches grow with wave number, capped at 10x10.
+    // At wave 100: ~3-5 (same as early). At wave 200: closer to 10.
+    const grown = Math.min(10, 3 + Math.floor((w - 100) / 20));
+    const lo = Math.min(grown, 5);
+    const hi = grown;
+    growOreInRing(prev, ORE_PATCHES_PER_WAVE, lo, hi);
+  }
+}
+
+function regenWorldPreview() {
+  // Preview always shows the initial-size active region for a new world.
+  const r = genOreGrid(worldGenSettings, getInitialBounds());
+  worldGenPreview = r.grid;
+  worldGenLastPlaced = r.placed;
+}
+let worldGenLastPlaced = 0;
+
+function applyNewWorld() {
+  // Wipe everything and reset active region to initial
+  buildings.clear();
+  uniqueBuildings.clear();
+  stations.length = 0;
+  train = null;
+  zombies.length = 0;
+  bullets.length = 0;
+  playerBullets.length = 0;
+  shells.length = 0;
+  explosions.length = 0;
+  setInitialActiveBounds();
+  if (worldGenPreview) ore.set(worldGenPreview);
+  else clearAllOre();
+  // Reset player to active region center
+  player.x = (xMin + xMax) / 2 * TILE;
+  player.y = (yMin + yMax) / 2 * TILE;
+  player.hp = PLAYER_MAX_HP;
+  player.facing = DIR.DOWN;
+  player.noZombieTimer = 0;
+  // Reset stats and waves
+  stats.oreMined = 0;
+  stats.ammoProduced = 0;
+  waveState.waveNumber = 0;
+  waveState.nextWaveAt = WAVE_FIRST_DELAY;
+  waveState.spawning = false;
+  waveState.spawned = 0;
+  waveState.spawnCount = 0;
+  updateCamera();
+  showToast("New world generated");
+}
+generateOrePatches();
+
+const player = {
+  x: (xMin + xMax) / 2 * TILE,
+  y: (yMin + yMax) / 2 * TILE,
+  hp: PLAYER_MAX_HP,
+  facing: DIR.DOWN,
+  noZombieTimer: 0,
+  gunCooldown: 0,
+};
+
+// Player-fired bullets (separate from turret line-bullets which are visual line traces).
+// Each: { x, y, vx, vy, distLeft }
+const playerBullets = [];
+
+// ============================================================
+// Buildings
+// ============================================================
+// Map "x,y" -> building object. Multi-tile buildings register the SAME object under every footprint cell.
+const buildings = new Map();
+// Set of unique building objects (one entry per real building, not per occupied cell).
+// Iterate THIS in tick functions instead of buildings.values() to avoid the multi-tile dedup tax.
+const uniqueBuildings = new Set();
+const stations = []; // up to MAX_STATIONS station building references
+function key(x, y) { return x + "," + y; }
+
+function buildingAt(x, y) { return buildings.get(key(x, y)); }
+
+// Returns the list of (x,y) tiles a building of this type/dir occupies, anchored at (ax, ay).
+// Anchor = top-left of bounding box for stations; for 1×1 buildings this is just (ax, ay).
+function footprintCells(type, ax, ay, dir) {
+  if (type === BTYPE.STATION) {
+    // 2 wide × 10 long. Long axis follows `dir`. ax/ay is one corner of the bounding box.
+    const horizontal = (dir === DIR.LEFT || dir === DIR.RIGHT);
+    const W = horizontal ? STATION_L : STATION_W;
+    const H = horizontal ? STATION_W : STATION_L;
+    const cells = [];
+    for (let dy = 0; dy < H; dy++) for (let dx = 0; dx < W; dx++) cells.push({ x: ax + dx, y: ay + dy });
+    return cells;
+  }
+  if (type === BTYPE.ARTILLERY) {
+    const cells = [];
+    for (let dy = 0; dy < 3; dy++) for (let dx = 0; dx < 3; dx++) cells.push({ x: ax + dx, y: ay + dy });
+    return cells;
+  }
+  if (type === BTYPE.HEAVY_ASSEMBLER) {
+    const cells = [];
+    for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 2; dx++) cells.push({ x: ax + dx, y: ay + dy });
+    return cells;
+  }
+  if (type === BTYPE.BIG_DRILL) {
+    const cells = [];
+    for (let dy = 0; dy < 3; dy++) for (let dx = 0; dx < 3; dx++) cells.push({ x: ax + dx, y: ay + dy });
+    return cells;
+  }
+  return [{ x: ax, y: ay }];
+}
+
+function placeBuilding(type, x, y, dir) {
+  // Wave-gated types
+  if (type === BTYPE.HEAVY_TURRET && waveState.waveNumber < HEAVY_TURRET_UNLOCK_WAVE) {
+    showToast("Heavy turret unlocks at wave " + HEAVY_TURRET_UNLOCK_WAVE); return false;
+  }
+  if (type === BTYPE.SNIPER_TURRET && waveState.waveNumber < SNIPER_TURRET_UNLOCK_WAVE) {
+    showToast("Sniper turret unlocks at wave " + SNIPER_TURRET_UNLOCK_WAVE); return false;
+  }
+  if ((type === BTYPE.STATION || type === BTYPE.RAIL) && waveState.waveNumber < RAIL_UNLOCK_WAVE) {
+    showToast("Railway unlocks at wave " + RAIL_UNLOCK_WAVE); return false;
+  }
+  if (type === BTYPE.ARTILLERY && waveState.waveNumber < ARTILLERY_UNLOCK_WAVE) {
+    showToast("Artillery unlocks at wave " + ARTILLERY_UNLOCK_WAVE); return false;
+  }
+  if (type === BTYPE.HEAVY_ASSEMBLER && waveState.waveNumber < ARTILLERY_UNLOCK_WAVE) {
+    showToast("Heavy assembler unlocks at wave " + ARTILLERY_UNLOCK_WAVE); return false;
+  }
+  if (type === BTYPE.BIG_DRILL && waveState.waveNumber < BIG_DRILL_UNLOCK_WAVE) {
+    showToast("Big drill unlocks at wave " + BIG_DRILL_UNLOCK_WAVE); return false;
+  }
+  if (type === BTYPE.STATION && stations.length >= MAX_STATIONS) {
+    showToast("Maximum " + MAX_STATIONS + " stations"); return false;
+  }
+  // Validate every footprint cell is in-bounds and unoccupied (and not under the player).
+  const cells = footprintCells(type, x, y, dir);
+  const ptx = Math.floor(player.x / TILE), pty = Math.floor(player.y / TILE);
+  for (const c of cells) {
+    if (!inBounds(c.x, c.y)) return false;
+    if (buildingAt(c.x, c.y)) return false;
+    if (c.x === ptx && c.y === pty) return false;
+  }
+  if (type === BTYPE.MINER && oreAt(x, y) <= 0 && !loadingBuildings) return false;
+  if (type === BTYPE.RAIL) {
+    // Can't place a rail directly perpendicular-adjacent to another rail (no parallel runs).
+    const isRail = b => b && b.type === BTYPE.RAIL;
+    const nUp = buildingAt(x, y - 1), nDown = buildingAt(x, y + 1);
+    const nLeft = buildingAt(x - 1, y), nRight = buildingAt(x + 1, y);
+    const verticalNeighbor = isRail(nUp) || isRail(nDown);
+    const horizontalNeighbor = isRail(nLeft) || isRail(nRight);
+    if (verticalNeighbor && horizontalNeighbor) return false;
+  }
+
+  const b = { type, x, y, dir, item: null, items: [], buffer: 0, ammo: 0, cooldown: 0, hp: 0, target: null, barrelAngle: 0, cells };
+  if (type === BTYPE.BELT) { b.item = null; b.itemProgress = 0; }
+  else if (type === BTYPE.TURRET) { b.barrelAngle = DIR_RAD[dir]; }
+  else if (type === BTYPE.HEAVY_TURRET) { b.barrelAngle = DIR_RAD[dir]; b.ammo = 0; }
+  else if (type === BTYPE.SNIPER_TURRET) { b.barrelAngle = DIR_RAD[dir]; b.ammo = 0; b.recoilT = 0; }
+  else if (type === BTYPE.WALL) { b.hp = WALL_HP; }
+  else if (type === BTYPE.SPLITTER) { b.item = null; b.outputIndex = 0; }
+  else if (type === BTYPE.UNDERGROUND_BELT) { b.item = null; }
+  else if (type === BTYPE.RAIL) { /* rails are passive track */ }
+  else if (type === BTYPE.ARTILLERY) { b.barrelAngle = DIR_RAD[dir]; b.buffer = 0; b.ammoBuf = 0; }
+  else if (type === BTYPE.HEAVY_ASSEMBLER) { b.buffer = 0; b.heavyBuf = 0; b.craftMax = 0; }
+  else if (type === BTYPE.BIG_DRILL) { b.drainAccum = 0; b.outputIndex = 0; }
+  else if (type === BTYPE.STATION) {
+    b.stationIndex = stations.length;
+    b.name = (typeof prompt === "function" ? (prompt("Station name?", "Station " + (b.stationIndex + 1)) || "") : "").trim();
+    if (!b.name) b.name = "Station " + (b.stationIndex + 1);
+    stations.push(b);
+  }
+
+  for (const c of cells) buildings.set(key(c.x, c.y), b);
+  uniqueBuildings.add(b);
+  return true;
+}
+
+function removeBuilding(x, y) {
+  const b = buildingAt(x, y);
+  if (!b) return;
+  const cells = b.cells || [{ x: b.x, y: b.y }];
+  for (const c of cells) buildings.delete(key(c.x, c.y));
+  uniqueBuildings.delete(b);
+  if (b.type === BTYPE.STATION) {
+    const i = stations.indexOf(b);
+    if (i >= 0) stations.splice(i, 1);
+    // Reindex
+    for (let k = 0; k < stations.length; k++) stations[k].stationIndex = k;
+    // Reset train if it was on this station
+    if (train && train.parkedStationIndex !== null && train.parkedStationIndex >= stations.length) {
+      train.parkedStationIndex = stations.length ? 0 : null;
+      train.status = stations.length ? "parked" : "idle";
+    }
+  }
+}
+
+// ============================================================
+// Belts & Items
+// ============================================================
+// Each belt holds at most 1 item with progress 0..1. When progress reaches 1, item attempts to transfer to next tile (belt facing same direction OR a building inlet).
+
+function beltNext(b) {
+  const nx = b.x + DX[b.dir], ny = b.y + DY[b.dir];
+  return buildingAt(nx, ny);
+}
+
+function tickBelts(dt) {
+  // collect belts and process; multiple passes to allow chained transfers
+  const belts = [];
+  for (const b of buildings.values()) if (b.type === BTYPE.BELT) belts.push(b);
+
+  // Advance progress
+  for (const b of belts) {
+    if (b.item != null) {
+      b.itemProgress += dt / BELT_INTERVAL;
+      if (b.itemProgress > 1) b.itemProgress = 1;
+    }
+  }
+
+  // Try to transfer items at end of belt (progress == 1).
+  // Multi-pass to allow chained movement within a single tick.
+  for (let pass = 0; pass < 4; pass++) {
+    let moved = false;
+    for (const b of belts) {
+      if (b.item == null || b.itemProgress < 1) continue;
+      const next = beltNext(b);
+      if (!next) continue;
+      if (tryAccept(next, b.item, b.dir)) {
+        b.item = null;
+        b.itemProgress = 0;
+        moved = true;
+      }
+    }
+    if (!moved) break;
+  }
+}
+
+// ============================================================
+// Rail / Station / Train
+// ============================================================
+// A rail-traversable cell is one that is in-bounds and either empty or part of an existing
+// rail or station. Used for both BFS pathfinding and the train's path.
+function isRailwayCell(x, y) {
+  if (!inBounds(x, y)) return false;
+  const b = buildingAt(x, y);
+  if (!b) return true;
+  return b.type === BTYPE.RAIL || b.type === BTYPE.STATION;
+}
+
+// 1-wide BFS for the rail centerline. Cells next to existing perpendicular rails
+// are blocked so two parallel rails can't end up adjacent.
+function findRailPath(start, end) {
+  if (!isRailwayCell(start.x, start.y) || !isRailwayCell(end.x, end.y)) return null;
+  // A cell is path-walkable if it's railway AND wouldn't sit beside an existing rail
+  // perpendicular to our travel direction.
+  function walkable(nx, ny, fromDir) {
+    if (!isRailwayCell(nx, ny)) return false;
+    const p1 = (fromDir + 1) % 4, p2 = (fromDir + 3) % 4;
+    const a = buildingAt(nx + DX[p1], ny + DY[p1]);
+    const b = buildingAt(nx + DX[p2], ny + DY[p2]);
+    if ((a && a.type === BTYPE.RAIL) || (b && b.type === BTYPE.RAIL)) return false;
+    return true;
+  }
+  const visited = new Map();
+  const queue = [{ x: start.x, y: start.y, parent: null }];
+  visited.set(start.x + "," + start.y, queue[0]);
+  let goal = null;
+  for (let qi = 0; qi < queue.length; qi++) {
+    const cur = queue[qi];
+    if (cur.x === end.x && cur.y === end.y) { goal = cur; break; }
+    for (let d = 0; d < 4; d++) {
+      const nx = cur.x + DX[d], ny = cur.y + DY[d];
+      const k = nx + "," + ny;
+      if (visited.has(k)) continue;
+      if (!walkable(nx, ny, d)) continue;
+      const next = { x: nx, y: ny, parent: cur };
+      visited.set(k, next);
+      queue.push(next);
+    }
+  }
+  if (!goal) return null;
+  const centerline = [];
+  for (let st = goal; st; st = st.parent) centerline.push({ x: st.x, y: st.y });
+  centerline.reverse();
+  const cells = centerline.slice();
+  cells.centerline = centerline;
+  return cells;
+}
+
+// True only if the cell IS an existing rail or station tile (not empty ground).
+// findRailPath uses isRailwayCell which treats empty cells as walkable (since rails get laid there);
+// the train must only walk on actual existing track.
+function isExistingRailCell(x, y) {
+  if (!inBounds(x, y)) return false;
+  const b = buildingAt(x, y);
+  return !!b && (b.type === BTYPE.RAIL || b.type === BTYPE.STATION);
+}
+
+// Train pathfinder: walks only over actual rail/station cells.
+function findTrainPath(start, end) {
+  if (!isExistingRailCell(start.x, start.y) || !isExistingRailCell(end.x, end.y)) return null;
+  const visited = new Map();
+  const queue = [{ x: start.x, y: start.y, parent: null }];
+  visited.set(start.x + "," + start.y, queue[0]);
+  let goal = null;
+  for (let qi = 0; qi < queue.length; qi++) {
+    const cur = queue[qi];
+    if (cur.x === end.x && cur.y === end.y) { goal = cur; break; }
+    for (let d = 0; d < 4; d++) {
+      const nx = cur.x + DX[d], ny = cur.y + DY[d];
+      const k = nx + "," + ny;
+      if (visited.has(k)) continue;
+      if (!isExistingRailCell(nx, ny)) continue;
+      const next = { x: nx, y: ny, parent: cur };
+      visited.set(k, next);
+      queue.push(next);
+    }
+  }
+  if (!goal) return null;
+  const cells = [];
+  for (let st = goal; st; st = st.parent) cells.push({ x: st.x, y: st.y });
+  cells.reverse();
+  return cells;
+}
+
+// For a station, return its two narrow-end cells, choosing whichever has an external
+// rail neighbor as the "entry" (where the train enters/exits) and the other as the "far"
+// end (where the locomotive parks).
+function stationEnds(s) {
+  const cells = s.cells || [{ x: s.x, y: s.y }];
+  let xMinT = Infinity, yMinT = Infinity, xMaxT = -Infinity, yMaxT = -Infinity;
+  for (const c of cells) {
+    if (c.x < xMinT) xMinT = c.x;
+    if (c.y < yMinT) yMinT = c.y;
+    if (c.x > xMaxT) xMaxT = c.x;
+    if (c.y > yMaxT) yMaxT = c.y;
+  }
+  const horizontal = (xMaxT - xMinT) > (yMaxT - yMinT);
+  let endA, endB, neighA, neighB;
+  if (horizontal) {
+    endA = { x: xMinT, y: yMinT };
+    endB = { x: xMaxT, y: yMinT };
+    neighA = { x: xMinT - 1, y: yMinT };
+    neighB = { x: xMaxT + 1, y: yMinT };
+  } else {
+    endA = { x: xMinT, y: yMinT };
+    endB = { x: xMinT, y: yMaxT };
+    neighA = { x: xMinT, y: yMinT - 1 };
+    neighB = { x: xMinT, y: yMaxT + 1 };
+  }
+  const railAt = (c) => {
+    const b = buildingAt(c.x, c.y);
+    return !!b && b.type === BTYPE.RAIL;
+  };
+  if (railAt(neighA)) return { entry: endA, far: endB };
+  if (railAt(neighB)) return { entry: endB, far: endA };
+  return { entry: endA, far: endB };
+}
+
+function pathStillValid(path) {
+  if (!path || path.length === 0) return false;
+  for (let i = 0; i < path.length; i++) {
+    if (!isExistingRailCell(path[i].x, path[i].y)) return false;
+  }
+  return true;
+}
+
+// Single shuttle train. Created on demand once both stations exist.
+let train = null;
+function ensureTrain() {
+  if (train) return;
+  if (stations.length < 2) return;
+  train = {
+    status: "parked",
+    parkedStationIndex: 0,
+    pathCells: null,
+    pathProgress: 0,
+    flipped: false,        // when true, storage car is rendered as front of motion
+    inventory: 0,
+    itemType: null,
+    outputCooldown: 0,
+    schedule: [
+      { stationIndex: 0, condition: "full" },
+      { stationIndex: 1, condition: "empty" },
+    ],
+    scheduleIdx: 0,
+    pos: { x: 0, y: 0 }, // pixel coords for rendering when moving
+  };
+  positionTrainAtStation(0);
+}
+
+function positionTrainAtStation(idx) {
+  if (!stations[idx]) return;
+  const s = stations[idx];
+  // Place the train head at the "near" end of the station.
+  train.pos.x = s.x * TILE + TILE;
+  train.pos.y = s.y * TILE + TILE;
+}
+
+function tickTrain(dt) {
+  if (!train) { ensureTrain(); return; }
+  if (stations.length < 2) return;
+  if (train.status === "parked") {
+    const stop = train.schedule[train.scheduleIdx];
+    if (!stop) return;
+    if (train.parkedStationIndex !== stop.stationIndex) {
+      // Schedule changed; re-snap to current parked station.
+      train.scheduleIdx = stop.stationIndex === train.parkedStationIndex ? train.scheduleIdx : (train.scheduleIdx + 1) % train.schedule.length;
+    }
+    const conditionMet = (stop.condition === "full" && train.inventory >= TRAIN_INVENTORY_MAX) ||
+                         (stop.condition === "empty" && train.inventory <= 0);
+    if (!conditionMet) return;
+    // Depart toward the next stop.
+    const nextIdx = (train.scheduleIdx + 1) % train.schedule.length;
+    const dest = train.schedule[nextIdx];
+    if (!dest || !stations[dest.stationIndex]) return;
+    const fromS = stations[train.parkedStationIndex];
+    const toS = stations[dest.stationIndex];
+    const fromEnds = stationEnds(fromS);
+    const toEnds = stationEnds(toS);
+    // Try to reuse the previous journey path reversed — guarantees the train's body
+    // stays on the same physical cells so it doesn't visually collapse on departure.
+    let path = null;
+    if (train.pathCells && train.pathCells.length >= 2) {
+      const last = train.pathCells[train.pathCells.length - 1];
+      const first = train.pathCells[0];
+      if (last.x === fromEnds.far.x && last.y === fromEnds.far.y &&
+          first.x === toEnds.far.x && first.y === toEnds.far.y) {
+        path = train.pathCells.slice().reverse();
+      }
+    }
+    if (!path) path = findTrainPath(fromEnds.far, toEnds.far);
+    if (!path || path.length < 2) { showToast("No rail path between stations"); return; }
+    train.pathCells = path;
+    // Seed progress to TRAIN_LENGTH so all 4 wheels start on the path (not collapsed at 0).
+    const trainLen = LOCOMOTIVE_L + COUPLING_GAP + STORAGE_L;
+    train.pathProgress = Math.min(trainLen, path.length - 1);
+    // Flip visual roles so the cargo car appears at the front of motion (since the train is
+    // physically reversing direction relative to its parked orientation).
+    train.flipped = !train.flipped;
+    train.status = "moving";
+    train.parkedStationIndex = null;
+    train.destStationIndex = dest.stationIndex;
+  } else if (train.status === "moving") {
+    if (!train.pathCells || train.pathCells.length === 0) { train.status = "parked"; return; }
+    // If the rail track has changed under us, try to re-route from the current cell to the goal.
+    if (!pathStillValid(train.pathCells)) {
+      const idx = Math.max(0, Math.min(train.pathCells.length - 1, Math.floor(train.pathProgress)));
+      const here = train.pathCells[idx];
+      const dest = stations[train.destStationIndex];
+      if (!dest || !isExistingRailCell(here.x, here.y)) {
+        showToast("Train derailed");
+        train.status = "parked";
+        train.parkedStationIndex = train.destStationIndex;
+        return;
+      }
+      const toEnds = stationEnds(dest);
+      const newPath = findTrainPath(here, toEnds.far);
+      if (!newPath || newPath.length < 2) {
+        showToast("No path to destination");
+        return;
+      }
+      train.pathCells = newPath;
+      train.pathProgress = 0;
+    }
+    train.pathProgress += TRAIN_SPEED * dt / TILE;
+    if (train.pathProgress >= train.pathCells.length - 1) {
+      // Arrived: keep the journey path so the train renders smoothly through the station.
+      train.pathProgress = train.pathCells.length - 1;
+      train.status = "parked";
+      train.parkedStationIndex = train.destStationIndex;
+      train.scheduleIdx = (train.scheduleIdx + 1) % train.schedule.length;
+    } else {
+      const idx = Math.floor(train.pathProgress);
+      const a = train.pathCells[idx];
+      const bC = train.pathCells[idx + 1];
+      const t = train.pathProgress - idx;
+      train.pos.x = (a.x + (bC.x - a.x) * t) * TILE + TILE / 2;
+      train.pos.y = (a.y + (bC.y - a.y) * t) * TILE + TILE / 2;
+    }
+  }
+}
+
+function tickStation(dt) {
+  if (!train) return;
+  if (train.status !== "parked") return;
+  if (train.inventory <= 0 || train.itemType == null) return;
+  if (train.outputCooldown > 0) { train.outputCooldown -= dt; return; }
+  const station = stations[train.parkedStationIndex];
+  if (!station) return;
+  const cells = station.cells || [{ x: station.x, y: station.y }];
+  for (const c of cells) {
+    for (let d = 0; d < 4; d++) {
+      const nx = c.x + DX[d], ny = c.y + DY[d];
+      const target = buildingAt(nx, ny);
+      if (!target || target === station) continue;
+      if (tryAccept(target, train.itemType, d)) {
+        train.inventory--;
+        if (train.inventory <= 0) train.itemType = null;
+        train.outputCooldown = TRAIN_OUTPUT_INTERVAL;
+        return;
+      }
+    }
+  }
+}
+
+// ============================================================
+// Item routing helpers (single source of truth for "X accepts item Y from direction D")
+// ============================================================
+function tryAccept(target, item, fromDir) {
+  if (!target) return false;
+  if (target.type === BTYPE.BELT) {
+    // Accept if the slot is empty AND the target isn't pointing straight back at us
+    // (forbidding head-on opposite belts prevents infinite ping-pong).
+    if (target.item == null && target.dir !== (fromDir + 2) % 4) {
+      target.item = item;
+      target.itemProgress = 0;
+      return true;
+    }
+    return false;
+  }
+  if (target.type === BTYPE.SPLITTER) {
+    if (target.item == null) { target.item = item; return true; }
+    return false;
+  }
+  if (target.type === BTYPE.UNDERGROUND_BELT) {
+    if (target.dir === fromDir && target.item == null) {
+      const r = undergroundRole(target);
+      if (r.role === "entry") { target.item = item; return true; }
+    }
+    return false;
+  }
+  if (target.type === BTYPE.ASSEMBLER) {
+    if (item === ITEM.ORE && (target.buffer || 0) < 8) { target.buffer = (target.buffer || 0) + 1; return true; }
+    if (item === ITEM.AMMO && (target.ammoBuf || 0) < 12) { target.ammoBuf = (target.ammoBuf || 0) + 1; return true; }
+    return false;
+  }
+  if (target.type === BTYPE.HEAVY_ASSEMBLER) {
+    if (item === ITEM.HEAVY_AMMO && (target.heavyBuf || 0) < HEAVY_ASSEMBLER_HEAVY_BUF_MAX) { target.heavyBuf = (target.heavyBuf || 0) + 1; return true; }
+    if (item === ITEM.ORE && (target.buffer || 0) < HEAVY_ASSEMBLER_ORE_BUF_MAX) { target.buffer = (target.buffer || 0) + 1; return true; }
+    return false;
+  }
+  if (target.type === BTYPE.TURRET) {
+    if (item === ITEM.AMMO && target.ammo < TURRET_AMMO_MAX) { target.ammo++; return true; }
+    if (item === ITEM.HEAVY_AMMO && target.ammo < TURRET_AMMO_MAX) {
+      target.ammo = Math.min(TURRET_AMMO_MAX, target.ammo + HEAVY_AMMO_PER_NORMAL_TURRET);
+      return true;
+    }
+    return false;
+  }
+  if (target.type === BTYPE.HEAVY_TURRET) {
+    if (item === ITEM.HEAVY_AMMO && target.ammo < HEAVY_TURRET_AMMO_MAX) {
+      target.ammo = Math.min(HEAVY_TURRET_AMMO_MAX, target.ammo + HEAVY_AMMO_PER_HEAVY_TURRET);
+      return true;
+    }
+    return false;
+  }
+  if (target.type === BTYPE.SNIPER_TURRET) {
+    if (item === ITEM.HEAVY_AMMO && target.ammo < SNIPER_TURRET_AMMO_MAX) { target.ammo++; return true; }
+    return false;
+  }
+  if (target.type === BTYPE.ARTILLERY) {
+    if (item === ITEM.SHELL && (target.ammo || 0) < ARTILLERY_SHELL_BUF_MAX) {
+      target.ammo = (target.ammo || 0) + 1; return true;
+    }
+    return false;
+  }
+  if (target.type === BTYPE.STATION) {
+    if (!train) return false;
+    if (train.status !== "parked") return false;
+    if (train.parkedStationIndex !== target.stationIndex) return false;
+    if (train.inventory >= TRAIN_INVENTORY_MAX) return false;
+    if (train.itemType != null && train.itemType !== item) return false;
+    train.itemType = item;
+    train.inventory++;
+    return true;
+  }
+  return false;
+}
+
+// Try to deposit `item` from building `b` into any of its 4 neighbors.
+// Prefers b.dir (its facing direction), then the other 3 sides.
+function tryOutputAny(b, item) {
+  const dirs = [b.dir, (b.dir + 1) % 4, (b.dir + 2) % 4, (b.dir + 3) % 4];
+  for (const d of dirs) {
+    const target = buildingAt(b.x + DX[d], b.y + DY[d]);
+    if (tryAccept(target, item, d)) return true;
+  }
+  return false;
+}
+
+// ============================================================
+// Underground belts
+// ============================================================
+// Each underground belt has a direction. It's an "entry" if another underground belt
+// in the same direction sits 1..UNDERGROUND_BELT_RANGE tiles ahead; that one is the "exit".
+// Items entering an entry teleport to the partner exit, then leave onto the belt ahead.
+function undergroundRole(b) {
+  for (let d = 1; d <= UNDERGROUND_BELT_RANGE; d++) {
+    const n = buildingAt(b.x + DX[b.dir]*d, b.y + DY[b.dir]*d);
+    if (n && n.type === BTYPE.UNDERGROUND_BELT && n.dir === b.dir) return { role: "entry", partner: n };
+  }
+  for (let d = 1; d <= UNDERGROUND_BELT_RANGE; d++) {
+    const n = buildingAt(b.x - DX[b.dir]*d, b.y - DY[b.dir]*d);
+    if (n && n.type === BTYPE.UNDERGROUND_BELT && n.dir === b.dir) return { role: "exit", partner: n };
+  }
+  return { role: "idle", partner: null };
+}
+
+function tickUndergroundBelts(dt) {
+  // Teleport items from entries to their paired exits.
+  for (const b of buildings.values()) {
+    if (b.type !== BTYPE.UNDERGROUND_BELT) continue;
+    if (b.item == null) continue;
+    const r = undergroundRole(b);
+    if (r.role !== "entry") continue;
+    if (r.partner.item == null) {
+      r.partner.item = b.item;
+      b.item = null;
+    }
+  }
+  // Exits push to the belt directly ahead.
+  for (const b of buildings.values()) {
+    if (b.type !== BTYPE.UNDERGROUND_BELT) continue;
+    if (b.item == null) continue;
+    const r = undergroundRole(b);
+    if (r.role !== "exit") continue;
+    const ahead = buildingAt(b.x + DX[b.dir], b.y + DY[b.dir]);
+    if (tryAccept(ahead, b.item, b.dir)) {
+      b.item = null;
+    }
+  }
+}
+
+// ============================================================
+// Splitters
+// ============================================================
+function tickSplitters(dt) {
+  for (const b of buildings.values()) {
+    if (b.type !== BTYPE.SPLITTER) continue;
+    if (b.item == null) continue;
+    // Gather any neighbor that would accept the current item, in any direction.
+    // Use a scratch test by attempting tryAccept on a clone field would be fragile;
+    // instead, replicate the acceptance check by trying tryAccept and rolling back is
+    // error-prone — we use a "dry-run" test by checking acceptance preconditions inline.
+    const candidates = [];
+    for (let d = 0; d < 4; d++) {
+      const n = buildingAt(b.x + DX[d], b.y + DY[d]);
+      if (!n) continue;
+      // Cheap acceptance probe: replicate tryAccept's precondition checks without mutating.
+      let ok = false;
+      const item = b.item;
+      if (n.type === BTYPE.BELT) ok = (n.item == null && n.dir !== (d + 2) % 4);
+      else if (n.type === BTYPE.SPLITTER) ok = (n.item == null);
+      else if (n.type === BTYPE.UNDERGROUND_BELT) {
+        if (n.dir === d && n.item == null) {
+          const r = undergroundRole(n);
+          ok = (r.role === "entry");
+        }
+      } else if (n.type === BTYPE.ASSEMBLER) {
+        ok = (item === ITEM.ORE && (n.buffer || 0) < 8) || (item === ITEM.AMMO && (n.ammoBuf || 0) < 12);
+      } else if (n.type === BTYPE.TURRET) {
+        ok = (item === ITEM.AMMO && n.ammo < TURRET_AMMO_MAX) || (item === ITEM.HEAVY_AMMO && n.ammo < TURRET_AMMO_MAX);
+      } else if (n.type === BTYPE.HEAVY_TURRET) {
+        ok = (item === ITEM.HEAVY_AMMO && n.ammo < HEAVY_TURRET_AMMO_MAX);
+      } else if (n.type === BTYPE.SNIPER_TURRET) {
+        ok = (item === ITEM.HEAVY_AMMO && n.ammo < SNIPER_TURRET_AMMO_MAX);
+      }
+      if (ok) candidates.push({ n, d });
+    }
+    if (candidates.length === 0) continue;
+    const idx = b.outputIndex % candidates.length;
+    const pick = candidates[idx];
+    if (tryAccept(pick.n, b.item, pick.d)) {
+      b.item = null;
+      b.outputIndex = (idx + 1) % candidates.length;
+    }
+  }
+}
+
+// ============================================================
+// Miners
+// ============================================================
+// True if no ore tile remains anywhere inside this big drill's 5x5 mining area.
+function bigDrillDepleted(b) {
+  const x0 = b.x - BIG_DRILL_RANGE, y0 = b.y - BIG_DRILL_RANGE;
+  const x1 = b.x + 2 + BIG_DRILL_RANGE, y1 = b.y + 2 + BIG_DRILL_RANGE;
+  for (let yy = y0; yy <= y1; yy++) {
+    for (let xx = x0; xx <= x1; xx++) {
+      if (oreAt(xx, yy) > 0) return false;
+    }
+  }
+  return true;
+}
+
+// Big drill: 3x3 footprint, mines a 5x5 area, outputs through any of the 12 perimeter cells.
+// 9× normal mining throughput with half the resource drain (each emitted ore costs 0.5 from a tile).
+function tickBigDrills(dt) {
+  const depleted = [];
+  for (const b of uniqueBuildings) {
+    if (b.type !== BTYPE.BIG_DRILL) continue;
+    if (!("drainAccum" in b)) b.drainAccum = 0;
+    if (!("outputIndex" in b)) b.outputIndex = 0;
+    b.cooldown -= dt;
+    while (b.cooldown <= 0) {
+      // Find ore tiles in the 5x5 area centered on the drill (footprint + 1-tile ring).
+      const x0 = b.x - BIG_DRILL_RANGE, y0 = b.y - BIG_DRILL_RANGE;
+      const x1 = b.x + 2 + BIG_DRILL_RANGE, y1 = b.y + 2 + BIG_DRILL_RANGE;
+      const oreCells = [];
+      for (let yy = y0; yy <= y1; yy++) {
+        for (let xx = x0; xx <= x1; xx++) {
+          if (oreAt(xx, yy) > 0) oreCells.push({ x: xx, y: yy });
+        }
+      }
+      if (oreCells.length === 0) { b.cooldown = 200; break; }
+      // Build the list of perimeter output candidates (12 cells around the 3x3 footprint).
+      const outs = [];
+      for (let i = 0; i < 3; i++) outs.push({ x: b.x + i,     y: b.y - 1,     d: DIR.UP });
+      for (let i = 0; i < 3; i++) outs.push({ x: b.x + 3,     y: b.y + i,     d: DIR.RIGHT });
+      for (let i = 0; i < 3; i++) outs.push({ x: b.x + i,     y: b.y + 3,     d: DIR.DOWN });
+      for (let i = 0; i < 3; i++) outs.push({ x: b.x - 1,     y: b.y + i,     d: DIR.LEFT });
+      // Round-robin so output spreads evenly across all 12 sides.
+      let placed = false;
+      for (let attempt = 0; attempt < outs.length; attempt++) {
+        const o = outs[(b.outputIndex + attempt) % outs.length];
+        const target = buildingAt(o.x, o.y);
+        if (tryAccept(target, ITEM.ORE, o.d)) {
+          b.outputIndex = (b.outputIndex + attempt + 1) % outs.length;
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) { b.cooldown = 100; break; }
+      // Half resource drain: spend 1 ore from a source tile every 2 emitted units.
+      b.drainAccum += 0.5;
+      if (b.drainAccum >= 1) {
+        const pick = oreCells[Math.floor(Math.random() * oreCells.length)];
+        const cur = oreAt(pick.x, pick.y);
+        setOre(pick.x, pick.y, cur > 0 ? cur - 1 : 0);
+        b.drainAccum -= 1;
+      }
+      stats.oreMined++;
+      b.cooldown += BIG_DRILL_INTERVAL;
+    }
+    if (bigDrillDepleted(b)) depleted.push(b);
+  }
+  // Auto-relocate depleted drills: shift the 3x3 backward 1 tile in its facing direction
+  // and lay 3 belts (facing forward) in the row that was vacated. Skip if blocked or no ore ahead.
+  for (const b of depleted) {
+    const dir = b.dir;
+    const newX = b.x - DX[dir], newY = b.y - DY[dir];
+    const newCells = [];
+    for (let yy = 0; yy < 3; yy++) for (let xx = 0; xx < 3; xx++) newCells.push({ x: newX + xx, y: newY + yy });
+    let ok = true;
+    for (const c of newCells) {
+      if (!inBounds(c.x, c.y)) { ok = false; break; }
+      const occ = buildingAt(c.x, c.y);
+      if (occ && occ !== b) { ok = false; break; }
+    }
+    if (!ok) continue;
+    const x0 = newX - BIG_DRILL_RANGE, y0 = newY - BIG_DRILL_RANGE;
+    const x1 = newX + 2 + BIG_DRILL_RANGE, y1 = newY + 2 + BIG_DRILL_RANGE;
+    let hasOre = false;
+    for (let yy = y0; yy <= y1 && !hasOre; yy++) {
+      for (let xx = x0; xx <= x1; xx++) {
+        if (oreAt(xx, yy) > 0) { hasOre = true; break; }
+      }
+    }
+    if (!hasOre) continue;
+    const newCellsSet = new Set(newCells.map(c => c.x + "," + c.y));
+    const vacated = (b.cells || []).filter(c => !newCellsSet.has(c.x + "," + c.y));
+    removeBuilding(b.x, b.y);
+    for (const v of vacated) placeBuilding(BTYPE.BELT, v.x, v.y, dir);
+    placeBuilding(BTYPE.BIG_DRILL, newX, newY, dir);
+  }
+}
+
+function tickMiners(dt) {
+  const depleted = [];
+  for (const b of buildings.values()) {
+    if (b.type !== BTYPE.MINER) continue;
+    if (oreAt(b.x, b.y) <= 0) { depleted.push(b); continue; }
+    b.cooldown -= dt;
+    if (b.cooldown <= 0) {
+      if (tryOutputAny(b, ITEM.ORE)) {
+        const cur = oreAt(b.x, b.y);
+        setOre(b.x, b.y, cur > 0 ? cur - 1 : 0);
+        stats.oreMined++;
+        b.cooldown = MINER_INTERVAL;
+      } else {
+        b.cooldown = 100;
+      }
+    }
+  }
+  // Auto-relocate depleted miners: replace miner with a belt going its facing direction,
+  // and place a new miner one tile behind. Skipped if the tile behind is occupied or has no ore —
+  // in that case the miner just sits with the out-of-ore indicator.
+  for (const b of depleted) {
+    const dir = b.dir;
+    const bx = b.x - DX[dir], by = b.y - DY[dir];
+    if (!inBounds(bx, by)) continue;
+    if (buildingAt(bx, by)) continue;
+    if (oreAt(bx, by) <= 0) continue;
+    removeBuilding(b.x, b.y);
+    placeBuilding(BTYPE.BELT, b.x, b.y, dir);
+    placeBuilding(BTYPE.MINER, bx, by, dir);
+  }
+}
+
+// ============================================================
+// Assemblers
+// ============================================================
+function tickAssemblers(dt) {
+  for (const b of buildings.values()) {
+    if (b.type !== BTYPE.ASSEMBLER) continue;
+    if (!("ammoBuf" in b)) b.ammoBuf = 0;
+    b.cooldown -= dt;
+    if (b.cooldown <= 0) {
+      // Output strictly in the facing direction.
+      const nx = b.x + DX[b.dir], ny = b.y + DY[b.dir];
+      const next = buildingAt(nx, ny);
+      // Recipe priority: heavy ammo > ammo. Shells now require a HEAVY_ASSEMBLER.
+      if (b.ammoBuf >= 4 && tryAccept(next, ITEM.HEAVY_AMMO, b.dir)) {
+        b.ammoBuf -= 4;
+        stats.heavyAmmoProduced = (stats.heavyAmmoProduced || 0) + 1;
+        b.cooldown = ASSEMBLER_INTERVAL;
+        b.craftMax = ASSEMBLER_INTERVAL;
+      } else if (b.buffer >= 2 && tryAccept(next, ITEM.AMMO, b.dir)) {
+        b.buffer -= 2;
+        stats.ammoProduced++;
+        b.cooldown = ASSEMBLER_INTERVAL;
+        b.craftMax = ASSEMBLER_INTERVAL;
+      } else {
+        b.cooldown = 100;
+        b.craftMax = 0; // idle — hide progress bar
+      }
+    }
+  }
+}
+
+function tickHeavyAssemblers(dt) {
+  for (const b of buildings.values()) {
+    if (b.type !== BTYPE.HEAVY_ASSEMBLER) continue;
+    b.cooldown -= dt;
+    if (b.cooldown <= 0) {
+      // Output goes one tile past the 2x2 footprint in the facing direction.
+      const nx = b.x + DX[b.dir] + (b.dir === DIR.RIGHT ? 1 : 0);
+      const ny = b.y + DY[b.dir] + (b.dir === DIR.DOWN ? 1 : 0);
+      const next = buildingAt(nx, ny);
+      if ((b.heavyBuf || 0) >= SHELL_HEAVY_COST && (b.buffer || 0) >= SHELL_ORE_COST && tryAccept(next, ITEM.SHELL, b.dir)) {
+        b.heavyBuf -= SHELL_HEAVY_COST;
+        b.buffer -= SHELL_ORE_COST;
+        stats.shellsProduced = (stats.shellsProduced || 0) + 1;
+        b.cooldown = HEAVY_ASSEMBLER_INTERVAL;
+        b.craftMax = HEAVY_ASSEMBLER_INTERVAL;
+      } else {
+        b.cooldown = 120;
+        b.craftMax = 0;
+      }
+    }
+  }
+}
+
+// Smoothly rotate `b.barrelAngle` toward `target` at most `maxRate` rad per ms.
+// Returns true once aimed within TURRET_AIM_TOLERANCE.
+function turnBarrel(b, target, maxRate, dt) {
+  let delta = target - b.barrelAngle;
+  while (delta > Math.PI) delta -= 2 * Math.PI;
+  while (delta < -Math.PI) delta += 2 * Math.PI;
+  const maxDelta = maxRate * dt;
+  if (Math.abs(delta) <= maxDelta) {
+    b.barrelAngle = target;
+    return true;
+  }
+  b.barrelAngle += Math.sign(delta) * maxDelta;
+  return Math.abs(delta) <= TURRET_AIM_TOLERANCE;
+}
+
+// Slow-flying artillery shells and their post-impact explosions.
+const shells = [];     // { x, y, vx, vy, tx, ty }
+const explosions = []; // { x, y, life, maxLife, radius }
+
+function tickArtillery(dt) {
+  const minR2 = ARTILLERY_MIN_RANGE * ARTILLERY_MIN_RANGE;
+  const maxR2 = ARTILLERY_RANGE * ARTILLERY_RANGE;
+  for (const b of uniqueBuildings) {
+    if (b.type !== BTYPE.ARTILLERY) continue;
+    const cx = (b.x + 1.5) * TILE, cy = (b.y + 1.5) * TILE;
+    // Pick the IMPACT POINT that maximizes zombies inside the blast radius — i.e., the
+    // densest cluster. Throttled to 5×/sec to keep cost low under heavy zombie counts.
+    if (!("targetCacheT" in b)) b.targetCacheT = 0;
+    b.targetCacheT -= dt;
+    if (b.targetCacheT <= 0) {
+      let bestX = 0, bestY = 0, bestCount = 0, bestArtilleryD2 = Infinity;
+      // Candidate impact points: every zombie inside the artillery's [min, max] band.
+      forEachZombieInRadius(cx, cy, ARTILLERY_RANGE, (z, d2) => {
+        if (d2 < minR2) return;
+        // Count zombies within blast radius of this candidate using the spatial grid.
+        let count = 0;
+        forEachZombieInRadius(z.x, z.y, ARTILLERY_BLAST_RADIUS, () => { count++; });
+        if (count > bestCount || (count === bestCount && d2 < bestArtilleryD2)) {
+          bestCount = count;
+          bestX = z.x;
+          bestY = z.y;
+          bestArtilleryD2 = d2;
+        }
+      });
+      b.cachedTargetX = bestX;
+      b.cachedTargetY = bestY;
+      b.cachedTargetCount = bestCount;
+      b.targetCacheT = 200;
+    }
+    const haveTarget = (b.cachedTargetCount || 0) > 0;
+    const bestX = b.cachedTargetX, bestY = b.cachedTargetY;
+    let aimed = false;
+    if (haveTarget) aimed = turnBarrel(b, Math.atan2(bestY - cy, bestX - cx), ARTILLERY_TURN_RATE, dt);
+    b.cooldown -= dt;
+    // Don't fire while our previous shell is still in flight.
+    if (b.cooldown <= 0 && haveTarget && aimed && (b.ammo || 0) > 0 && !b.activeShell) {
+      b.ammo--;
+      const muzzleDist = TILE * 4;
+      const mx = cx + Math.cos(b.barrelAngle) * muzzleDist;
+      const my = cy + Math.sin(b.barrelAngle) * muzzleDist;
+      const dx = bestX - mx, dy = bestY - my;
+      const dist = Math.hypot(dx, dy) || 1;
+      const shell = {
+        x: mx, y: my,
+        vx: dx / dist * ARTILLERY_SHELL_SPEED,
+        vy: dy / dist * ARTILLERY_SHELL_SPEED,
+        tx: bestX, ty: bestY,
+        owner: b,
+      };
+      shells.push(shell);
+      b.activeShell = shell;
+      b.cooldown = ARTILLERY_INTERVAL;
+    } else if (b.cooldown <= 0) {
+      b.cooldown = 80;
+    }
+  }
+}
+
+function tickShells(dt) {
+  // Move each shell. When it reaches its target tile (or overshoots), detonate.
+  for (let i = shells.length - 1; i >= 0; i--) {
+    const s = shells[i];
+    s.x += s.vx * dt;
+    s.y += s.vy * dt;
+    const dx = s.tx - s.x, dy = s.ty - s.y;
+    // Detonate when within a half-tile of the target OR when we're moving past it
+    // (dot product of remaining vector with velocity is negative).
+    const dot = dx * s.vx + dy * s.vy;
+    if (dx * dx + dy * dy < (TILE * 0.5) * (TILE * 0.5) || dot < 0) {
+      // Boom: kill every zombie in the blast radius (spatial-grid query).
+      forEachZombieInRadius(s.tx, s.ty, ARTILLERY_BLAST_RADIUS, (z) => { z.hp = 0; });
+      explosions.push({ x: s.tx, y: s.ty, life: 600, maxLife: 600, radius: ARTILLERY_BLAST_RADIUS });
+      if (s.owner) s.owner.activeShell = null; // free the artillery to fire again
+      shells.splice(i, 1);
+    }
+  }
+  for (let i = explosions.length - 1; i >= 0; i--) {
+    explosions[i].life -= dt;
+    if (explosions[i].life <= 0) explosions.splice(i, 1);
+  }
+}
+
+function tickSniperTurrets(dt) {
+  for (const b of uniqueBuildings) {
+    if (b.type !== BTYPE.SNIPER_TURRET) continue;
+    if (b.recoilT > 0) b.recoilT = Math.max(0, b.recoilT - dt);
+    const cx = b.x * TILE + TILE/2, cy = b.y * TILE + TILE/2;
+    let best = null, bestD = SNIPER_TURRET_RANGE * SNIPER_TURRET_RANGE;
+    forEachZombieInRadius(cx, cy, SNIPER_TURRET_RANGE, (z, d2) => {
+      if (d2 < bestD) { bestD = d2; best = z; }
+    });
+    let aimedSn = false;
+    if (best) aimedSn = turnBarrel(b, Math.atan2(best.y - cy, best.x - cx), SNIPER_TURRET_TURN_RATE, dt);
+    b.cooldown -= dt;
+    if (b.cooldown <= 0 && best && b.ammo > 0 && aimedSn) {
+      b.ammo--;
+      best.hp -= SNIPER_TURRET_DMG;
+      // muzzle starts ~2 tiles out from the turret center
+      const mx = cx + Math.cos(b.barrelAngle) * (TILE * 2);
+      const my = cy + Math.sin(b.barrelAngle) * (TILE * 2);
+      bullets.push({ x1: mx, y1: my, x2: best.x, y2: best.y, life: 120 });
+      b.recoilT = SNIPER_RECOIL_MS;
+      b.cooldown = SNIPER_TURRET_INTERVAL;
+    } else if (b.cooldown <= 0) {
+      b.cooldown = 80;
+    }
+  }
+}
+
+function tickHeavyTurrets(dt) {
+  for (const b of uniqueBuildings) {
+    if (b.type !== BTYPE.HEAVY_TURRET) continue;
+    const cx = b.x * TILE + TILE/2, cy = b.y * TILE + TILE/2;
+    // collect zombies in range via the spatial grid, then sort by distance
+    const inRange = [];
+    forEachZombieInRadius(cx, cy, TURRET_RANGE, (z, d2) => { inRange.push({ z, d2 }); });
+    inRange.sort((a, b2) => a.d2 - b2.d2);
+    const closest = inRange[0] && inRange[0].z;
+    let aimedHv = false;
+    if (closest) aimedHv = turnBarrel(b, Math.atan2(closest.y - cy, closest.x - cx), HEAVY_TURRET_TURN_RATE, dt);
+    b.cooldown -= dt;
+    if (b.cooldown <= 0 && closest && b.ammo > 0 && aimedHv) {
+      b.ammo--;
+      const sprAngle = (Math.random() - 0.5) * 0.2;
+      const baseAngle = Math.atan2(closest.y - cy, closest.x - cx) + sprAngle;
+      const reach = Math.hypot(closest.x - cx, closest.y - cy);
+      closest.hp -= HEAVY_TURRET_DMG_PER_BULLET;
+      bullets.push({ x1: cx, y1: cy, x2: cx + Math.cos(baseAngle) * reach, y2: cy + Math.sin(baseAngle) * reach, life: 60 });
+      b.cooldown = HEAVY_TURRET_INTERVAL;
+    } else if (b.cooldown <= 0) {
+      b.cooldown = 50;
+    }
+  }
+}
+
+// ============================================================
+// Turrets & Bullets
+// ============================================================
+const bullets = []; // {x1,y1,x2,y2,life}
+
+function tickTurrets(dt) {
+  for (const b of uniqueBuildings) {
+    if (b.type !== BTYPE.TURRET) continue;
+    // Find nearest zombie in range — use spatial grid.
+    let best = null, bestDist = TURRET_RANGE * TURRET_RANGE;
+    const cx = b.x * TILE + TILE/2, cy = b.y * TILE + TILE/2;
+    forEachZombieInRadius(cx, cy, TURRET_RANGE, (z, d2) => {
+      if (d2 < bestDist) { bestDist = d2; best = z; }
+    });
+    b.target = best;
+    let aimed = false;
+    if (best) aimed = turnBarrel(b, Math.atan2(best.y - cy, best.x - cx), TURRET_TURN_RATE, dt);
+    b.cooldown -= dt;
+    if (b.cooldown <= 0 && best && b.ammo > 0 && aimed) {
+      b.ammo--;
+      best.hp -= TURRET_DMG;
+      bullets.push({ x1: cx, y1: cy, x2: best.x, y2: best.y, life: 80 });
+      b.cooldown = TURRET_INTERVAL;
+    } else if (b.cooldown <= 0) {
+      b.cooldown = 50;
+    }
+  }
+  for (let i = bullets.length - 1; i >= 0; i--) {
+    bullets[i].life -= dt;
+    if (bullets[i].life <= 0) bullets.splice(i, 1);
+  }
+}
+
+// ============================================================
+// Zombies
+// ============================================================
+const zombies = []; // {x,y,hp,dead,fade,attackCd}
+
+function nearestTarget(zx, zy) {
+  let best = { x: player.x, y: player.y, isPlayer: true, building: null };
+  let bestD = (player.x - zx)**2 + (player.y - zy)**2;
+  for (const b of uniqueBuildings) {
+    // Rails are passive track and produce many entries; zombies don't path to them.
+    if (b.type === BTYPE.RAIL) continue;
+    const bx = b.x * TILE + TILE/2, by = b.y * TILE + TILE/2;
+    const d = (bx - zx)**2 + (by - zy)**2;
+    if (d < bestD) { bestD = d; best = { x: bx, y: by, isPlayer: false, building: b }; }
+  }
+  return best;
+}
+
+// ============================================================
+// Spatial index for zombies (rebuilt every frame) and a query helper.
+// ============================================================
+const ZOMBIE_CHUNK_PX = TILE * 8;
+let zombieGrid = new Map();
+
+function rebuildZombieGrid() {
+  zombieGrid.clear();
+  for (const z of zombies) {
+    if (z.dead || z.hp <= 0) continue;
+    const k = Math.floor(z.x / ZOMBIE_CHUNK_PX) + "," + Math.floor(z.y / ZOMBIE_CHUNK_PX);
+    let bucket = zombieGrid.get(k);
+    if (!bucket) { bucket = []; zombieGrid.set(k, bucket); }
+    bucket.push(z);
+  }
+}
+
+// Iterate every live zombie within `radius` px of (x, y) and call fn(z, d2).
+function forEachZombieInRadius(x, y, radius, fn) {
+  const r2 = radius * radius;
+  const cMinX = Math.floor((x - radius) / ZOMBIE_CHUNK_PX);
+  const cMaxX = Math.floor((x + radius) / ZOMBIE_CHUNK_PX);
+  const cMinY = Math.floor((y - radius) / ZOMBIE_CHUNK_PX);
+  const cMaxY = Math.floor((y + radius) / ZOMBIE_CHUNK_PX);
+  for (let cy = cMinY; cy <= cMaxY; cy++) {
+    for (let cx = cMinX; cx <= cMaxX; cx++) {
+      const bucket = zombieGrid.get(cx + "," + cy);
+      if (!bucket) continue;
+      for (const z of bucket) {
+        if (z.dead || z.hp <= 0) continue;
+        const dx = z.x - x, dy = z.y - y;
+        const d2 = dx*dx + dy*dy;
+        if (d2 <= r2) fn(z, d2);
+      }
+    }
+  }
+}
+
+function tickZombies(dt) {
+  let nearestToPlayerD2 = Infinity;
+  for (const z of zombies) {
+    if (z.dead) {
+      z.fade -= dt;
+      continue;
+    }
+    // Reuse the cached target for ~800 ms; recompute when expired or when the building it
+    // pointed at no longer exists. Massive cost reduction for large zombie counts.
+    if (!("targetCacheT" in z)) z.targetCacheT = 0;
+    z.targetCacheT -= dt;
+    let target = z.cachedTarget;
+    const cachedBuildingDead = target && target.building && !uniqueBuildings.has(target.building);
+    if (z.targetCacheT <= 0 || !target || cachedBuildingDead) {
+      target = nearestTarget(z.x, z.y);
+      z.cachedTarget = target;
+      z.targetCacheT = 800;
+    }
+    // The cached target is a snapshot for buildings (still moves for the player).
+    if (target.isPlayer) { target = { x: player.x, y: player.y, isPlayer: true, building: null }; }
+    const dx = target.x - z.x, dy = target.y - z.y;
+    const dist = Math.hypot(dx, dy);
+    const meleeRange = TILE * 0.8;
+    if (dist > meleeRange) {
+      const sp = z.speed || ZOMBIE_SPEED;
+      const vx = dx / dist * sp * dt;
+      const vy = dy / dist * sp * dt;
+      // Simple collision: don't enter solid building tiles (walls/buildings except current target's building)
+      const newX = z.x + vx, newY = z.y + vy;
+      const tx = Math.floor(newX / TILE), ty = Math.floor(newY / TILE);
+      const occ = buildingAt(tx, ty);
+      if (!occ || (target.building && occ === target.building)) {
+        z.x = newX; z.y = newY;
+      } else {
+        // attack the blocking building
+        z.attackCd -= dt;
+        if (z.attackCd <= 0) {
+          if (occ.type === BTYPE.WALL) {
+            occ.hp -= ZOMBIE_DMG_PER_SEC * 0.5;
+            if (occ.hp <= 0) removeBuilding(occ.x, occ.y);
+          } else {
+            removeBuilding(occ.x, occ.y);
+          }
+          z.attackCd = 500;
+        }
+      }
+      z.bob += dt * 0.01;
+    } else {
+      // attack target
+      z.attackCd -= dt;
+      if (z.attackCd <= 0) {
+        if (target.isPlayer) {
+          player.hp -= ZOMBIE_DMG_PER_SEC * 0.5;
+        } else if (target.building) {
+          if (target.building.type === BTYPE.WALL) {
+            target.building.hp -= ZOMBIE_DMG_PER_SEC * 0.5;
+            if (target.building.hp <= 0) removeBuilding(target.building.x, target.building.y);
+          } else {
+            removeBuilding(target.building.x, target.building.y);
+          }
+        }
+        z.attackCd = 500;
+      }
+    }
+    if (z.hp <= 0) { z.dead = true; z.fade = 400; }
+
+    const pd2 = (z.x - player.x)**2 + (z.y - player.y)**2;
+    if (pd2 < nearestToPlayerD2) nearestToPlayerD2 = pd2;
+  }
+
+  // Player damage from melee zombies — spatial-grid query.
+  forEachZombieInRadius(player.x, player.y, TILE * 0.8, () => {
+    player.hp -= PLAYER_DMG_PER_SEC * (dt / 1000);
+  });
+
+  // Regen
+  if (Math.sqrt(nearestToPlayerD2) > 5 * TILE) {
+    player.noZombieTimer += dt;
+    if (player.noZombieTimer > 3000) {
+      player.hp = Math.min(PLAYER_MAX_HP, player.hp + 1 * (dt / 1000));
+    }
+  } else {
+    player.noZombieTimer = 0;
+  }
+
+  // Cleanup
+  for (let i = zombies.length - 1; i >= 0; i--) {
+    if (zombies[i].dead && zombies[i].fade <= 0) zombies.splice(i, 1);
+  }
+
+  if (player.hp <= 0 && !gameOver) triggerGameOver();
+}
+
+function firePlayerGun() {
+  if (gameOver || paused) return;
+  if (player.gunCooldown > 0) return;
+  // Aim toward the mouse cursor (mouseX/mouseY are world coords).
+  const dx = mouseX - player.x, dy = mouseY - player.y;
+  const dist = Math.hypot(dx, dy) || 1;
+  playerBullets.push({
+    x: player.x, y: player.y,
+    vx: dx / dist * PLAYER_BULLET_SPEED,
+    vy: dy / dist * PLAYER_BULLET_SPEED,
+    distLeft: PLAYER_BULLET_RANGE,
+  });
+  player.gunCooldown = PLAYER_GUN_RELOAD;
+}
+
+function tickPlayerBullets(dt) {
+  if (player.gunCooldown > 0) player.gunCooldown = Math.max(0, player.gunCooldown - dt);
+  for (let i = playerBullets.length - 1; i >= 0; i--) {
+    const b = playerBullets[i];
+    const stepX = b.vx * dt, stepY = b.vy * dt;
+    const stepLen = Math.hypot(stepX, stepY);
+    b.x += stepX; b.y += stepY;
+    b.distLeft -= stepLen;
+    // Out of range → despawn.
+    if (b.distLeft <= 0) { playerBullets.splice(i, 1); continue; }
+    // Wall collision (only walls block).
+    const tx = Math.floor(b.x / TILE), ty = Math.floor(b.y / TILE);
+    const cell = buildingAt(tx, ty);
+    if (cell && cell.type === BTYPE.WALL) {
+      // Damage the wall a bit and remove the bullet.
+      cell.hp -= PLAYER_BULLET_DMG;
+      if (cell.hp <= 0) removeBuilding(cell.x, cell.y);
+      playerBullets.splice(i, 1);
+      continue;
+    }
+    // Zombie collision — small radius, spatial-grid lookup.
+    let hit = null;
+    forEachZombieInRadius(b.x, b.y, TILE * 0.5, (z) => {
+      if (!hit) hit = z;
+    });
+    if (hit) {
+      hit.hp -= PLAYER_BULLET_DMG;
+      playerBullets.splice(i, 1);
+    }
+  }
+}
+
+function spawnZombieAt(x, y, opts) {
+  opts = opts || {};
+  zombies.push({
+    x, y,
+    hp: ZOMBIE_HP,
+    dead: false,
+    fade: 400,
+    attackCd: 0,
+    bob: Math.random() * Math.PI * 2,
+    speed: opts.speed || ZOMBIE_SPEED,
+    isBoss: !!opts.isBoss,
+  });
+}
+
+// ============================================================
+// Waves
+// ============================================================
+const waveState = {
+  waveNumber: 0,
+  nextWaveAt: WAVE_FIRST_DELAY,
+  spawning: false,
+  spawnPoints: [],
+  spawnCount: 0,
+  spawned: 0,
+  spawnTimer: 0,
+  spawnInterval: 0,
+};
+
+function randomEdgeSpawnPoint() {
+  const ax0 = xMin * TILE, ay0 = yMin * TILE, ax1 = xMax * TILE, ay1 = yMax * TILE;
+  const edge = Math.floor(Math.random() * 4);
+  if (edge === 0) return { x: ax0 + Math.random() * (ax1 - ax0), y: ay0 };
+  if (edge === 1) return { x: ax1, y: ay0 + Math.random() * (ay1 - ay0) };
+  if (edge === 2) return { x: ax0 + Math.random() * (ax1 - ax0), y: ay1 };
+  return { x: ax0, y: ay0 + Math.random() * (ay1 - ay0) };
+}
+
+function startWave(now) {
+  waveState.waveNumber++;
+  // Expand the world on every wave start (wave 1 onward).
+  growWorld();
+  const isBoss = (waveState.waveNumber % 10 === 0);
+  waveState.bossWave = isBoss;
+  let count = 5 + waveState.waveNumber * 3;
+  if (isBoss) count *= 4; // 4x zombies on boss waves
+  // Hard caps: normal waves cap at 500 zombies, boss waves cap at 2000.
+  count = Math.min(count, isBoss ? 2000 : 500);
+  waveState.spawnCount = count;
+  waveState.spawned = 0;
+  waveState.spawnTimer = 0;
+  // 4x more zombies in the same window = 4x spawn rate naturally.
+  waveState.spawnInterval = WAVE_SPAWN_WINDOW / waveState.spawnCount;
+  waveState.spawning = true;
+  // Grace before the next wave: 60s + current wave number, rounded up to nearest 10s.
+  const graceSeconds = Math.ceil((60 + waveState.waveNumber) / 10) * 10;
+  waveState.nextWaveAt = graceSeconds * 1000;
+}
+
+function liveZombieCount() {
+  let n = 0;
+  for (const z of zombies) if (!z.dead) n++;
+  return n;
+}
+
+function tickWaves(dt, now) {
+  if (waveState.spawning) {
+    waveState.spawnTimer += dt;
+    while (waveState.spawned < waveState.spawnCount && waveState.spawnTimer >= waveState.spawnInterval) {
+      waveState.spawnTimer -= waveState.spawnInterval;
+      const p = randomEdgeSpawnPoint();
+      spawnZombieAt(p.x, p.y, waveState.bossWave ? { isBoss: true, speed: ZOMBIE_SPEED * 2 } : null);
+      waveState.spawned++;
+    }
+    if (waveState.spawned >= waveState.spawnCount) waveState.spawning = false;
+  } else {
+    // Only count down the next-wave timer once all zombies from the prior wave are dead.
+    // The first wave (waveNumber === 0) ticks down freely (initial grace period).
+    if (waveState.waveNumber === 0 || liveZombieCount() === 0) {
+      waveState.nextWaveAt -= dt;
+      if (waveState.nextWaveAt <= 0) startWave(now);
+    }
+  }
+}
+
+// ============================================================
+// Save / Load
+// ============================================================
+const SAVE_KEY = "factoryDefenseSave_v1";
+let toastText = "";
+let toastTimer = 0;
+function showToast(msg) { toastText = msg; toastTimer = 2000; }
+
+function saveGame() {
+  if (gameOver) return;
+  const oreData = [];
+  // Iterate the active region only — outside that range ore can never be set.
+  for (let y = yMin; y < yMax; y++) {
+    for (let x = xMin; x < xMax; x++) {
+      const v = oreAt(x, y);
+      if (v > 0) oreData.push([x, y, v]);
+    }
+  }
+  const bData = [];
+  const seenB = new Set();
+  for (const b of buildings.values()) {
+    if (seenB.has(b)) continue;
+    seenB.add(b);
+    bData.push({
+      t: b.type, x: b.x, y: b.y, d: b.dir,
+      it: b.item, ip: b.itemProgress || 0,
+      bf: b.buffer || 0, ab: b.ammoBuf || 0, hb: b.heavyBuf || 0,
+      am: b.ammo || 0, hp: b.hp || 0,
+      oi: b.outputIndex || 0,
+      nm: b.name || undefined,
+    });
+  }
+  const data = {
+    ore: oreData,
+    buildings: bData,
+    player: { x: player.x, y: player.y, hp: player.hp, facing: player.facing },
+    stats: { oreMined: stats.oreMined, ammoProduced: stats.ammoProduced },
+    wave: {
+      n: waveState.waveNumber,
+      next: waveState.nextWaveAt,
+      spawning: waveState.spawning,
+      count: waveState.spawnCount,
+      spawned: waveState.spawned,
+    },
+    bounds: { xMin, yMin, xMax, yMax },
+    train: train ? {
+      inv: train.inventory,
+      it: train.itemType,
+      psi: train.parkedStationIndex,
+      sch: train.schedule,
+      si: train.scheduleIdx,
+      fl: train.flipped ? 1 : 0,
+    } : null,
+    blueprints: blueprints,
+    // Persist live zombies so a save mid-wave restores the in-progress fight.
+    zombies: zombies.filter(z => !z.dead).map(z => ({
+      x: z.x, y: z.y, hp: z.hp,
+      ac: z.attackCd || 0,
+      sp: z.speed || ZOMBIE_SPEED,
+      bs: z.isBoss ? 1 : 0,
+    })),
+  };
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+    showToast("Game saved");
+  } catch (e) {
+    showToast("Save failed");
+  }
+}
+
+function loadGame() {
+  const raw = localStorage.getItem(SAVE_KEY);
+  if (!raw) { showToast("No save found"); return; }
+  let data;
+  try { data = JSON.parse(raw); } catch (e) { showToast("Save corrupted"); return; }
+  // Clear world
+  clearAllOre();
+  buildings.clear();
+  uniqueBuildings.clear();
+  zombies.length = 0;
+  bullets.length = 0;
+  playerBullets.length = 0;
+  shells.length = 0;
+  explosions.length = 0;
+  // Restore active bounds (fallback to initial if missing in old saves)
+  if (data.bounds) {
+    xMin = data.bounds.xMin; yMin = data.bounds.yMin;
+    xMax = data.bounds.xMax; yMax = data.bounds.yMax;
+    recomputeWH();
+  } else {
+    setInitialActiveBounds();
+  }
+  // Restore ore
+  for (const [x, y, n] of data.ore) setOre(x, y, n);
+  // Restore wave FIRST so unlock checks (e.g. heavy turret) pass during placement
+  waveState.waveNumber = data.wave.n;
+  waveState.nextWaveAt = data.wave.next;
+  waveState.spawning = false;
+  waveState.spawned = data.wave.count || 0;
+  waveState.spawnCount = data.wave.count || 0;
+  // Reset station/train state before restoring
+  stations.length = 0;
+  train = null;
+  blueprints = Array.isArray(data.blueprints) ? data.blueprints.filter(bp => bp && bp.name && Array.isArray(bp.items)) : [];
+  // Restore buildings. For STATION we bypass the prompt by pre-stashing the saved name,
+  // since placeBuilding asks via prompt() — temporarily stub it.
+  // Set loadingBuildings so placeBuilding skips placement-time validations (e.g. depleted
+  // miners would otherwise be dropped because their ore tile is now empty).
+  loadingBuildings = true;
+  const realPrompt = window.prompt;
+  let nextStationName = null;
+  window.prompt = () => nextStationName;
+  for (const s of data.buildings) {
+    if (s.t === BTYPE.STATION) nextStationName = s.nm || ("Station " + (stations.length + 1));
+    placeBuilding(s.t, s.x, s.y, s.d);
+    const b = buildingAt(s.x, s.y);
+    if (!b) continue;
+    if ("it" in s) b.item = s.it;
+    if ("ip" in s) b.itemProgress = s.ip;
+    if ("bf" in s) b.buffer = s.bf;
+    if ("ab" in s) b.ammoBuf = s.ab;
+    if ("hb" in s) b.heavyBuf = s.hb;
+    if ("am" in s) b.ammo = s.am;
+    if ("hp" in s && s.t === BTYPE.WALL) b.hp = s.hp;
+    if ("oi" in s) b.outputIndex = s.oi;
+  }
+  window.prompt = realPrompt;
+  loadingBuildings = false;
+  // Restore train state if saved
+  if (data.train && stations.length >= 2) {
+    ensureTrain();
+    if (train) {
+      train.inventory = Math.max(0, Math.min(TRAIN_INVENTORY_MAX, data.train.inv || 0));
+      train.itemType = (data.train.it != null && train.inventory > 0) ? data.train.it : null;
+      train.flipped = !!data.train.fl;
+      train.parkedStationIndex = (data.train.psi != null && stations[data.train.psi]) ? data.train.psi : 0;
+      train.scheduleIdx = data.train.si || 0;
+      if (Array.isArray(data.train.sch) && data.train.sch.length === 2) {
+        train.schedule = data.train.sch;
+      }
+      train.status = "parked";
+      positionTrainAtStation(train.parkedStationIndex);
+    }
+  }
+  // Player
+  player.x = data.player.x; player.y = data.player.y;
+  player.hp = data.player.hp; player.facing = data.player.facing;
+  player.noZombieTimer = 0;
+  // Stats
+  stats.oreMined = data.stats.oreMined;
+  stats.ammoProduced = data.stats.ammoProduced;
+  // Restore live zombies (skipped if missing — older saves had no zombies field).
+  if (Array.isArray(data.zombies)) {
+    for (const z of data.zombies) {
+      zombies.push({
+        x: z.x, y: z.y,
+        hp: z.hp,
+        dead: false, fade: 400,
+        attackCd: z.ac || 0,
+        bob: Math.random() * Math.PI * 2,
+        speed: z.sp || ZOMBIE_SPEED,
+        isBoss: !!z.bs,
+      });
+    }
+  }
+  // (wave already restored before building placement)
+  if (gameOver) {
+    gameOver = false;
+    document.getElementById("overlay").innerHTML = "";
+  }
+  showToast("Game loaded");
+}
+
+// ============================================================
+// Stats / GameOver
+// ============================================================
+const stats = { oreMined: 0, ammoProduced: 0 };
+
+function triggerGameOver() {
+  gameOver = true;
+  const overlay = document.getElementById("overlay");
+  overlay.innerHTML = `<div class="panel">You survived ${waveState.waveNumber} waves.<br><button id="restart">Restart</button></div>`;
+  document.getElementById("restart").onclick = () => location.reload();
+}
+
+// ============================================================
+// Player update
+// ============================================================
+function updateCamera() {
+  camX = player.x - VIEW_W / 2;
+  camY = player.y - VIEW_H / 2;
+  const minCamX = xMin * TILE, minCamY = yMin * TILE;
+  const maxCamX = xMax * TILE - VIEW_W, maxCamY = yMax * TILE - VIEW_H;
+  if (camX < minCamX) camX = minCamX;
+  if (camY < minCamY) camY = minCamY;
+  if (camX > maxCamX) camX = maxCamX;
+  if (camY > maxCamY) camY = maxCamY;
+  // refresh mouse world coords (camera may have moved)
+  mouseX = mouseScreenX + camX;
+  mouseY = mouseScreenY + camY;
+  mouseTileX = Math.floor(mouseX / TILE);
+  mouseTileY = Math.floor(mouseY / TILE);
+}
+
+function tickPlayer(dt) {
+  let dx = 0, dy = 0;
+  if (keys["w"]) dy -= 1;
+  if (keys["s"]) dy += 1;
+  if (keys["a"]) dx -= 1;
+  if (keys["d"]) dx += 1;
+  if (dx || dy) {
+    const len = Math.hypot(dx, dy);
+    dx /= len; dy /= len;
+    player.x += dx * PLAYER_SPEED * dt;
+    player.y += dy * PLAYER_SPEED * dt;
+    if (Math.abs(dx) > Math.abs(dy)) player.facing = dx > 0 ? DIR.RIGHT : DIR.LEFT;
+    else player.facing = dy > 0 ? DIR.DOWN : DIR.UP;
+  }
+  const pad = TILE * 0.4;
+  const minPx = xMin * TILE + pad, minPy = yMin * TILE + pad;
+  const maxPx = xMax * TILE - pad, maxPy = yMax * TILE - pad;
+  if (player.x < minPx) player.x = minPx;
+  if (player.y < minPy) player.y = minPy;
+  if (player.x > maxPx) player.x = maxPx;
+  if (player.y > maxPy) player.y = maxPy;
+}
+
+function handleClicks() {
+  if (leftClickQueued) {
+    leftClickQueued = false;
+    if (inBounds(mouseTileX, mouseTileY)) {
+      // Blueprint capture: click two corners of the rectangle.
+      if (blueprintCapture) {
+        if (!blueprintCapture.start) {
+          blueprintCapture.start = { x: mouseTileX, y: mouseTileY };
+          showToast("Click 2nd corner");
+        } else {
+          const bp = buildBlueprintFromRect(
+            blueprintCapture.start.x, blueprintCapture.start.y,
+            mouseTileX, mouseTileY, blueprintCapture.name);
+          if (bp.items.length === 0) {
+            showToast("Empty area — capture cancelled");
+          } else {
+            blueprints.push(bp);
+            showToast("Saved \"" + bp.name + "\" (" + bp.items.length + " bldgs)");
+          }
+          blueprintCapture = null;
+        }
+        return;
+      }
+      // Blueprint place: anchor is the cursor tile.
+      if (blueprintPlace) {
+        const placed = placeBlueprintAt(blueprintPlace, mouseTileX, mouseTileY);
+        showToast("Placed " + placed + "/" + blueprintPlace.items.length);
+        return;
+      }
+      // Click on a station opens the schedule modal.
+      const clicked = buildingAt(mouseTileX, mouseTileY);
+      if (clicked && clicked.type === BTYPE.STATION) {
+        openScheduleModal();
+      } else if (selectedBuilding === BTYPE.RAIL) {
+        // Two-click rail tool flow.
+        if (!railToolStart) {
+          railToolStart = { x: mouseTileX, y: mouseTileY };
+        } else {
+          const path = findRailPath(railToolStart, { x: mouseTileX, y: mouseTileY });
+          if (!path) {
+            showToast("No rail path");
+          } else {
+            for (const cell of path) placeBuilding(BTYPE.RAIL, cell.x, cell.y, DIR.RIGHT);
+          }
+          railToolStart = null;
+        }
+      } else {
+        placeBuilding(selectedBuilding, mouseTileX, mouseTileY, placementDir);
+      }
+    }
+  }
+  if (rightClickQueued) {
+    rightClickQueued = false;
+    if (blueprintPlace) { blueprintPlace = null; showToast("Cancelled"); }
+    else if (blueprintCapture) { blueprintCapture = null; showToast("Capture cancelled"); }
+    else if (selectedBuilding === BTYPE.RAIL && railToolStart) {
+      railToolStart = null; // cancel rail laying
+    } else if (inBounds(mouseTileX, mouseTileY)) {
+      removeBuilding(mouseTileX, mouseTileY);
+    }
+  }
+  // Right-button held: delete any building under the cursor while dragging.
+  if (rightHeld && !scheduleModalOpen && !blueprintModalOpen && !blueprintCapture && !blueprintPlace
+      && !gameOver && !paused && inBounds(mouseTileX, mouseTileY)) {
+    if (!(selectedBuilding === BTYPE.RAIL && railToolStart)) {
+      removeBuilding(mouseTileX, mouseTileY);
+    }
+  }
+  // Left-button held: drag-place buildings under the cursor (no-ops if the spot's already filled).
+  if (leftHeld && !leftClickQueued && !scheduleModalOpen && !blueprintModalOpen && !blueprintCapture
+      && !blueprintPlace && !showMap && !gameOver && !paused
+      && inBounds(mouseTileX, mouseTileY) && selectedBuilding !== BTYPE.RAIL) {
+    const here = buildingAt(mouseTileX, mouseTileY);
+    if (!(here && here.type === BTYPE.STATION)) {
+      placeBuilding(selectedBuilding, mouseTileX, mouseTileY, placementDir);
+    }
+  }
+}
+
+// ============================================================
+// Render
+// ============================================================
+function drawShadow(x, y, w, h) {
+  ctx.fillStyle = COL.shadow;
+  ctx.fillRect(x + 2, y + 2, w, h);
+}
+
+function drawGround() {
+  const x0 = Math.max(xMin, Math.floor(camX / TILE));
+  const y0 = Math.max(yMin, Math.floor(camY / TILE));
+  const x1 = Math.min(xMax, Math.ceil((camX + VIEW_W) / TILE));
+  const y1 = Math.min(yMax, Math.ceil((camY + VIEW_H) / TILE));
+  ctx.fillStyle = COL.ground;
+  ctx.fillRect(x0*TILE, y0*TILE, (x1-x0)*TILE, (y1-y0)*TILE);
+  // subtle grid
+  ctx.strokeStyle = COL.grid;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let x = x0; x <= x1; x++) { ctx.moveTo(x*TILE, y0*TILE); ctx.lineTo(x*TILE, y1*TILE); }
+  for (let y = y0; y <= y1; y++) { ctx.moveTo(x0*TILE, y*TILE); ctx.lineTo(x1*TILE, y*TILE); }
+  ctx.stroke();
+  // ore
+  for (let y = y0; y < y1; y++) {
+    for (let x = x0; x < x1; x++) {
+      if (oreAt(x, y) > 0) {
+        ctx.fillStyle = COL.oreTile;
+        ctx.fillRect(x*TILE, y*TILE, TILE, TILE);
+        ctx.fillStyle = COL.oreDot;
+        ctx.fillRect(x*TILE+5, y*TILE+5, 3, 3);
+        ctx.fillRect(x*TILE+15, y*TILE+8, 3, 3);
+        ctx.fillRect(x*TILE+8, y*TILE+15, 3, 3);
+        ctx.fillRect(x*TILE+17, y*TILE+17, 3, 3);
+      }
+    }
+  }
+}
+
+function isRailLikeBuilding(b) {
+  return !!b && (b.type === BTYPE.RAIL || b.type === BTYPE.STATION);
+}
+
+// Rail visual constants — chunky factorio-flavoured rails.
+// Gauge kept smaller than TILE/2 so a corner's inner-rail arc still has visible radius.
+const RAIL_GAUGE = 9;        // half-distance between the two metal rails
+const RAIL_LINE_W = 6;       // metal rail thickness
+const TIE_LEN = 24;          // sleeper length (perpendicular to rails) — full tile
+const TIE_W = 7;             // sleeper width (along rails)
+const TIE_SPACING = 9;       // gap between sleeper centers
+const COL_GRAVEL = "#3a3027";
+const COL_TIE = "#7a4a1f";
+const COL_RAIL = "#dcdcdc";
+
+// Draw a rail tile, factorio-flavoured. 1-cell-wide track.
+// Renders straight runs as continuous double-rails with brown wooden ties; renders corners as
+// curves; renders T/cross junctions as a straight axis with stubs; renders isolated stubs cleanly.
+// True only if neighbor in `dir` should logically connect to this rail tile.
+// Rejects "parallel run" neighbors: if both this tile and the neighbor have rails
+// in the perpendicular axis, they're side-by-side parallel tracks, not a junction.
+function railConnects(b, dir) {
+  const dxs = [0, 1, 0, -1], dys = [-1, 0, 1, 0];
+  const nx = b.x + dxs[dir], ny = b.y + dys[dir];
+  const n = buildingAt(nx, ny);
+  if (!n || (n.type !== BTYPE.RAIL && n.type !== BTYPE.STATION)) return false;
+  if (n.type === BTYPE.STATION) return true;
+  // Perpendicular directions to `dir`.
+  const p1 = (dir + 1) % 4, p2 = (dir + 3) % 4;
+  const thisHasPerp = isRailLikeBuilding(buildingAt(b.x + dxs[p1], b.y + dys[p1]))
+                   || isRailLikeBuilding(buildingAt(b.x + dxs[p2], b.y + dys[p2]));
+  const nbHasPerp = isRailLikeBuilding(buildingAt(nx + dxs[p1], ny + dys[p1]))
+                 || isRailLikeBuilding(buildingAt(nx + dxs[p2], ny + dys[p2]));
+  // Both parallel tracks → don't connect.
+  if (thisHasPerp && nbHasPerp) return false;
+  return true;
+}
+
+function drawRailTile(b, px, py) {
+  const cx = px + TILE/2, cy = py + TILE/2;
+  // Gravel base — fills the whole tile so adjacent tiles tile seamlessly.
+  ctx.fillStyle = COL_GRAVEL;
+  ctx.fillRect(px, py, TILE, TILE);
+
+  const conn = [
+    railConnects(b, 0),
+    railConnects(b, 1),
+    railConnects(b, 2),
+    railConnects(b, 3),
+  ];
+  const dirs = [];
+  for (let i = 0; i < 4; i++) if (conn[i]) dirs.push(i);
+
+  ctx.lineCap = "butt";
+
+  if (dirs.length === 0) return; // bare gravel for orphans
+
+  if (dirs.length === 2 && (dirs[0] + 2) % 4 === dirs[1]) {
+    // straight (opposite directions)
+    drawStraightRail(px, py, dirs[0]);
+  } else if (dirs.length === 2) {
+    // corner (perpendicular pair)
+    drawCornerRail(px, py, dirs[0], dirs[1]);
+  } else if (dirs.length === 1) {
+    drawStubRail(px, py, dirs[0]);
+  } else {
+    // 3-way (T) or 4-way: pick whichever opposite-pair is connected as the through axis,
+    // draw it as a straight, and add half-stubs for the perpendicular branches.
+    let mainDir = -1;
+    if (conn[0] && conn[2]) mainDir = 0; // up-down
+    else if (conn[1] && conn[3]) mainDir = 1; // left-right
+    if (mainDir >= 0) drawStraightRail(px, py, mainDir);
+    for (let i = 0; i < 4; i++) {
+      if (!conn[i]) continue;
+      if (mainDir >= 0 && (i === mainDir || i === (mainDir + 2) % 4)) continue;
+      drawStubRail(px, py, i, true);
+    }
+  }
+}
+
+function drawStraightRail(px, py, dir) {
+  const cx = px + TILE/2, cy = py + TILE/2;
+  const horizontal = (dir === 1 || dir === 3);
+  // Sleepers — perpendicular to rails.
+  ctx.fillStyle = COL_TIE;
+  if (horizontal) {
+    for (let tx = px + Math.floor(TIE_SPACING / 2); tx < px + TILE - 1; tx += TIE_SPACING) {
+      ctx.fillRect(tx, cy - TIE_LEN/2, TIE_W, TIE_LEN);
+    }
+  } else {
+    for (let ty = py + Math.floor(TIE_SPACING / 2); ty < py + TILE - 1; ty += TIE_SPACING) {
+      ctx.fillRect(cx - TIE_LEN/2, ty, TIE_LEN, TIE_W);
+    }
+  }
+  // Two metal rails.
+  ctx.strokeStyle = COL_RAIL;
+  ctx.lineWidth = RAIL_LINE_W;
+  ctx.beginPath();
+  if (horizontal) {
+    ctx.moveTo(px, cy - RAIL_GAUGE); ctx.lineTo(px + TILE, cy - RAIL_GAUGE);
+    ctx.moveTo(px, cy + RAIL_GAUGE); ctx.lineTo(px + TILE, cy + RAIL_GAUGE);
+  } else {
+    ctx.moveTo(cx - RAIL_GAUGE, py); ctx.lineTo(cx - RAIL_GAUGE, py + TILE);
+    ctx.moveTo(cx + RAIL_GAUGE, py); ctx.lineTo(cx + RAIL_GAUGE, py + TILE);
+  }
+  ctx.stroke();
+}
+
+function drawCornerRail(px, py, d1, d2) {
+  const cx = px + TILE/2, cy = py + TILE/2;
+  const dxs = [0, 1, 0, -1], dys = [-1, 0, 1, 0];
+  // Arc center: corner of tile where the dir1 edge meets the dir2 edge.
+  const arcCx = cx + (dxs[d1] + dxs[d2]) * (TILE/2);
+  const arcCy = cy + (dys[d1] + dys[d2]) * (TILE/2);
+  // Start/end angles: from arc center toward the midpoint of each direction's edge.
+  const dir1MidX = cx + dxs[d1] * (TILE/2);
+  const dir1MidY = cy + dys[d1] * (TILE/2);
+  const dir2MidX = cx + dxs[d2] * (TILE/2);
+  const dir2MidY = cy + dys[d2] * (TILE/2);
+  const startAngle = Math.atan2(dir1MidY - arcCy, dir1MidX - arcCx);
+  const endAngle   = Math.atan2(dir2MidY - arcCy, dir2MidX - arcCx);
+  // Choose direction that takes the short (90°) path.
+  let delta = endAngle - startAngle;
+  while (delta > Math.PI) delta -= 2 * Math.PI;
+  while (delta < -Math.PI) delta += 2 * Math.PI;
+  const ccw = delta < 0;
+  const sweep = Math.abs(delta);
+  const innerR = TILE/2 - RAIL_GAUGE;
+  const outerR = TILE/2 + RAIL_GAUGE;
+
+  // Sleepers along the curve, perpendicular to the rails (i.e. radial).
+  ctx.fillStyle = COL_TIE;
+  const arcLen = sweep * (TILE/2);
+  const numTies = Math.max(2, Math.round(arcLen / TIE_SPACING));
+  for (let i = 0; i < numTies; i++) {
+    const t = (i + 0.5) / numTies;
+    const angle = startAngle + (ccw ? -t * sweep : t * sweep);
+    const tx = arcCx + (TILE/2) * Math.cos(angle);
+    const ty = arcCy + (TILE/2) * Math.sin(angle);
+    ctx.save();
+    ctx.translate(tx, ty);
+    // Sleeper's long axis is along the radius (perpendicular to track).
+    ctx.rotate(angle);
+    ctx.fillRect(-TIE_LEN / 2, -TIE_W / 2, TIE_LEN, TIE_W);
+    ctx.restore();
+  }
+
+  // Two metal rails — proper circular arcs.
+  ctx.strokeStyle = COL_RAIL;
+  ctx.lineWidth = RAIL_LINE_W;
+  ctx.beginPath();
+  ctx.arc(arcCx, arcCy, innerR, startAngle, endAngle, ccw);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(arcCx, arcCy, outerR, startAngle, endAngle, ccw);
+  ctx.stroke();
+}
+
+function drawStubRail(px, py, dir, skipTies) {
+  const cx = px + TILE/2, cy = py + TILE/2;
+  const dxs = [0, 1, 0, -1], dys = [-1, 0, 1, 0];
+  const dx = dxs[dir], dy = dys[dir];
+  const perpX = -dy, perpY = dx;
+  // Half-tile of sleepers from center to edge in direction `dir`.
+  if (!skipTies) {
+    ctx.fillStyle = COL_TIE;
+    const horizontal = (dir === 1 || dir === 3);
+    if (horizontal) {
+      const start = dx > 0 ? cx + Math.floor(TIE_SPACING / 2) : px + Math.floor(TIE_SPACING / 2);
+      const end = dx > 0 ? px + TILE - 1 : cx;
+      for (let tx = start; tx < end; tx += TIE_SPACING) ctx.fillRect(tx, cy - TIE_LEN/2, TIE_W, TIE_LEN);
+    } else {
+      const start = dy > 0 ? cy + Math.floor(TIE_SPACING / 2) : py + Math.floor(TIE_SPACING / 2);
+      const end = dy > 0 ? py + TILE - 1 : cy;
+      for (let ty = start; ty < end; ty += TIE_SPACING) ctx.fillRect(cx - TIE_LEN/2, ty, TIE_LEN, TIE_W);
+    }
+  }
+  // Two rails from tile center to edge.
+  ctx.strokeStyle = COL_RAIL;
+  ctx.lineWidth = RAIL_LINE_W;
+  ctx.beginPath();
+  ctx.moveTo(cx + perpX * RAIL_GAUGE, cy + perpY * RAIL_GAUGE);
+  ctx.lineTo(cx + dx * (TILE/2) + perpX * RAIL_GAUGE, cy + dy * (TILE/2) + perpY * RAIL_GAUGE);
+  ctx.moveTo(cx - perpX * RAIL_GAUGE, cy - perpY * RAIL_GAUGE);
+  ctx.lineTo(cx + dx * (TILE/2) - perpX * RAIL_GAUGE, cy + dy * (TILE/2) - perpY * RAIL_GAUGE);
+  ctx.stroke();
+}
+
+function drawBuilding(b) {
+  const px = b.x * TILE, py = b.y * TILE;
+  drawShadow(px, py, TILE, TILE);
+  if (b.type === BTYPE.MINER) {
+    ctx.fillStyle = COL.miner;
+    ctx.fillRect(px, py, TILE, TILE);
+    ctx.strokeStyle = "#3a2d18";
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 3; i++) {
+      const lx = px + 6 + i*6;
+      ctx.beginPath();
+      ctx.moveTo(lx, py + 6);
+      ctx.lineTo(lx, py + TILE - 6);
+      ctx.stroke();
+    }
+    // facing arrow indicator
+    ctx.fillStyle = "#ffcc66";
+    drawArrow(px + TILE/2, py + TILE/2, b.dir, 5);
+    // Out-of-ore indicator: pulsing red badge in the top-right corner of the miner.
+    if (oreAt(b.x, b.y) <= 0) {
+      const pulse = 0.65 + 0.35 * Math.sin(performance.now() / 200);
+      ctx.globalAlpha = pulse;
+      ctx.fillStyle = "#d23030";
+      ctx.beginPath();
+      ctx.arc(px + TILE - 5, py + 5, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#000";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 8px ui-monospace, Consolas, monospace";
+      ctx.textBaseline = "middle";
+      ctx.textAlign = "center";
+      ctx.fillText("!", px + TILE - 5, py + 5);
+      ctx.textAlign = "start";
+      ctx.textBaseline = "top";
+      ctx.globalAlpha = 1;
+    }
+  } else if (b.type === BTYPE.BELT) {
+    ctx.fillStyle = COL.belt;
+    ctx.fillRect(px, py, TILE, TILE);
+    // animated arrow position
+    const phase = b.item != null ? b.itemProgress : (performance.now() % BELT_INTERVAL) / BELT_INTERVAL;
+    const offX = (DX[b.dir]) * (phase - 0.5) * TILE * 0.4;
+    const offY = (DY[b.dir]) * (phase - 0.5) * TILE * 0.4;
+    ctx.fillStyle = COL.beltArrow;
+    drawArrow(px + TILE/2 + offX, py + TILE/2 + offY, b.dir, 6);
+    if (b.item != null) {
+      // item position along belt (moves from "in" side to "out" side)
+      const startX = px + TILE/2 - DX[b.dir] * TILE/2;
+      const startY = py + TILE/2 - DY[b.dir] * TILE/2;
+      const endX = px + TILE/2 + DX[b.dir] * TILE/2;
+      const endY = py + TILE/2 + DY[b.dir] * TILE/2;
+      const ix = startX + (endX - startX) * b.itemProgress;
+      const iy = startY + (endY - startY) * b.itemProgress;
+      drawItem(ix, iy, b.item);
+    }
+  } else if (b.type === BTYPE.ASSEMBLER) {
+    ctx.fillStyle = COL.assembler;
+    ctx.fillRect(px, py, TILE, TILE);
+    // cog
+    ctx.strokeStyle = "#3a1d10";
+    ctx.lineWidth = 2;
+    const cx = px + TILE/2, cy = py + TILE/2;
+    const r = 6;
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) {
+      const a = i * Math.PI / 4;
+      const a2 = a + Math.PI / 8;
+      ctx.moveTo(cx + Math.cos(a)*r, cy + Math.sin(a)*r);
+      ctx.lineTo(cx + Math.cos(a)*(r+3), cy + Math.sin(a)*(r+3));
+      ctx.moveTo(cx + Math.cos(a2)*r, cy + Math.sin(a2)*r);
+    }
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.stroke();
+    // output direction tick
+    ctx.fillStyle = "#ffeecc";
+    drawArrow(cx + DX[b.dir]*7, cy + DY[b.dir]*7, b.dir, 3);
+    // Crafting progress bar underneath the assembler — only shown while actively crafting.
+    if (b.craftMax && b.craftMax > 0) {
+      const progress = Math.max(0, Math.min(1, 1 - b.cooldown / b.craftMax));
+      const barY = py + TILE - 3;
+      ctx.fillStyle = "#222";
+      ctx.fillRect(px + 1, barY, TILE - 2, 3);
+      ctx.fillStyle = "#7fff7f";
+      ctx.fillRect(px + 1, barY, (TILE - 2) * progress, 3);
+    }
+  } else if (b.type === BTYPE.TURRET) {
+    ctx.fillStyle = COL.turret;
+    ctx.fillRect(px, py, TILE, TILE);
+    const cx = px + TILE/2, cy = py + TILE/2;
+    ctx.fillStyle = "#222";
+    ctx.beginPath();
+    ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+    ctx.fill();
+    // barrel
+    ctx.strokeStyle = "#bbb";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(b.barrelAngle) * 10, cy + Math.sin(b.barrelAngle) * 10);
+    ctx.stroke();
+    // ammo dots
+    ctx.fillStyle = COL.ammo;
+    const dots = Math.min(4, Math.ceil(b.ammo / 5));
+    for (let i = 0; i < dots; i++) {
+      ctx.fillRect(px + 2 + i*4, py + 2, 3, 3);
+    }
+  } else if (b.type === BTYPE.BIG_DRILL) {
+    const baseX = b.x * TILE, baseY = b.y * TILE;
+    const sz = 3 * TILE;
+    const cx = baseX + sz / 2, cy = baseY + sz / 2;
+    const t = performance.now();
+    drawShadow(baseX, baseY, sz, sz);
+    // Faint range ring showing the 5×5 mining area.
+    ctx.strokeStyle = "rgba(255, 200, 80, 0.22)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(baseX - TILE + 1, baseY - TILE + 1, sz + 2 * TILE - 2, sz + 2 * TILE - 2);
+    // Beveled industrial base — outer dark frame, inner lighter plate.
+    ctx.fillStyle = "#2a1d10";
+    ctx.fillRect(baseX, baseY, sz, sz);
+    ctx.fillStyle = "#5a4028";
+    ctx.fillRect(baseX + 4, baseY + 4, sz - 8, sz - 8);
+    // Output chutes — short dark bars at each cardinal mid-edge to suggest exhaust ports.
+    ctx.fillStyle = "#1a1208";
+    ctx.fillRect(cx - 8, baseY - 2,   16, 7);            // top
+    ctx.fillRect(cx - 8, baseY + sz - 5, 16, 7);          // bottom
+    ctx.fillRect(baseX - 2,    cy - 8, 7, 16);            // left
+    ctx.fillRect(baseX + sz - 5, cy - 8, 7, 16);          // right
+    // Corner rivets.
+    ctx.fillStyle = "#181008";
+    for (const [rx, ry] of [[8, 8], [sz - 8, 8], [8, sz - 8], [sz - 8, sz - 8]]) {
+      ctx.beginPath();
+      ctx.arc(baseX + rx, baseY + ry, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = "#5a4028";
+    for (const [rx, ry] of [[8, 8], [sz - 8, 8], [8, sz - 8], [sz - 8, sz - 8]]) {
+      ctx.beginPath();
+      ctx.arc(baseX + rx - 0.5, baseY + ry - 0.5, 1.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Big rotating gear (slow).
+    const angOuter = (t / 1200);
+    const outerR = 24;
+    const teeth = 12;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(angOuter);
+    // Gear teeth
+    ctx.fillStyle = "#3a2818";
+    for (let i = 0; i < teeth; i++) {
+      const a = (i / teeth) * Math.PI * 2;
+      ctx.save();
+      ctx.rotate(a);
+      ctx.fillRect(outerR - 2, -3, 5, 6);
+      ctx.restore();
+    }
+    // Gear body
+    ctx.fillStyle = "#7a5a38";
+    ctx.beginPath(); ctx.arc(0, 0, outerR - 1, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#2a1a0a";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    // Spokes on the outer gear
+    ctx.strokeStyle = "#3a2818";
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * 6, Math.sin(a) * 6);
+      ctx.lineTo(Math.cos(a) * (outerR - 4), Math.sin(a) * (outerR - 4));
+      ctx.stroke();
+    }
+    ctx.restore();
+    // Counter-rotating inner ring.
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(-angOuter * 2.2);
+    ctx.fillStyle = "#3a2818";
+    ctx.beginPath(); ctx.arc(0, 0, 13, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#1a1208";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    // Inner gear teeth
+    ctx.fillStyle = "#5a4028";
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      ctx.save();
+      ctx.rotate(a);
+      ctx.fillRect(11, -2, 4, 4);
+      ctx.restore();
+    }
+    ctx.restore();
+    // Fast-spinning drill bit at the very center.
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(t / 60);
+    ctx.fillStyle = "#cfd0d4";
+    ctx.beginPath();
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI * 2;
+      const a2 = a + (Math.PI * 2 / 6);
+      ctx.lineTo(Math.cos(a) * 8, Math.sin(a) * 8);
+      ctx.lineTo(Math.cos(a2) * 3, Math.sin(a2) * 3);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = "#222";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    // Center hub
+    ctx.fillStyle = "#1a1a1a";
+    ctx.beginPath(); ctx.arc(0, 0, 2.5, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    // Pulsing status lights at the 4 cardinal mid-edges (between the chute bars).
+    const pulse = 0.55 + 0.45 * Math.sin(t / 280);
+    ctx.fillStyle = "rgba(120, 255, 120, " + (0.55 + 0.4 * pulse) + ")";
+    ctx.beginPath(); ctx.arc(baseX + 8,        cy,            2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(baseX + sz - 8,   cy,            2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx,               baseY + 8,     2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx,               baseY + sz - 8, 2, 0, Math.PI * 2); ctx.fill();
+    // Out-of-ore indicator: pulsing red badge in the top-right corner if 5x5 range is empty.
+    if (bigDrillDepleted(b)) {
+      const pulseI = 0.65 + 0.35 * Math.sin(t / 200);
+      ctx.globalAlpha = pulseI;
+      ctx.fillStyle = "#d23030";
+      ctx.beginPath();
+      ctx.arc(baseX + sz - 8, baseY + 8, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#000";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 11px ui-monospace, Consolas, monospace";
+      ctx.textBaseline = "middle";
+      ctx.textAlign = "center";
+      ctx.fillText("!", baseX + sz - 8, baseY + 8);
+      ctx.textAlign = "start";
+      ctx.textBaseline = "top";
+      ctx.globalAlpha = 1;
+    }
+  } else if (b.type === BTYPE.HEAVY_ASSEMBLER) {
+    const baseX = b.x * TILE, baseY = b.y * TILE;
+    const sz = 2 * TILE;
+    drawShadow(baseX, baseY, sz, sz);
+    ctx.fillStyle = "#7a3a18";
+    ctx.fillRect(baseX, baseY, sz, sz);
+    ctx.strokeStyle = "#3a1d10";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(baseX + 1, baseY + 1, sz - 2, sz - 2);
+    const cxA = baseX + sz / 2, cyA = baseY + sz / 2;
+    // Cog (bigger version of the regular assembler's)
+    ctx.strokeStyle = "#3a1d10";
+    ctx.lineWidth = 3;
+    const r = 12;
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) {
+      const a = i * Math.PI / 4;
+      ctx.moveTo(cxA + Math.cos(a) * r, cyA + Math.sin(a) * r);
+      ctx.lineTo(cxA + Math.cos(a) * (r + 4), cyA + Math.sin(a) * (r + 4));
+    }
+    ctx.arc(cxA, cyA, r, 0, Math.PI * 2);
+    ctx.stroke();
+    // Output direction marker (bigger arrow at the facing edge)
+    ctx.fillStyle = "#ffeecc";
+    drawArrow(cxA + DX[b.dir] * (sz / 2 - 4), cyA + DY[b.dir] * (sz / 2 - 4), b.dir, 6);
+    // Crafting progress bar across the bottom edge.
+    if (b.craftMax && b.craftMax > 0) {
+      const progress = Math.max(0, Math.min(1, 1 - b.cooldown / b.craftMax));
+      const barY = baseY + sz - 4;
+      ctx.fillStyle = "#222";
+      ctx.fillRect(baseX + 2, barY, sz - 4, 4);
+      ctx.fillStyle = "#7fff7f";
+      ctx.fillRect(baseX + 2, barY, (sz - 4) * progress, 4);
+    }
+    // Buffer dots — heavy ammo (orange) top-left, ore (silver) top-right.
+    ctx.fillStyle = "#ff8800";
+    for (let i = 0; i < Math.min(8, b.heavyBuf || 0); i++) ctx.fillRect(baseX + 3 + i * 4, baseY + 3, 3, 3);
+    ctx.fillStyle = "#c0c0c0";
+    for (let i = 0; i < Math.min(8, b.buffer || 0); i++) ctx.fillRect(baseX + sz - 3 - (i + 1) * 4, baseY + 3, 3, 3);
+  } else if (b.type === BTYPE.ARTILLERY) {
+    // 3x3 base — only render when this iteration is the anchor cell (handled by `seen` dedup
+    // in render(), so we just draw at the anchor position once).
+    if (b.x * TILE !== px || b.y * TILE !== py) {
+      // shouldn't happen since drawBuilding is called with anchor coords, but guard anyway
+    }
+    const baseX = b.x * TILE, baseY = b.y * TILE;
+    const baseSize = 3 * TILE;
+    drawShadow(baseX, baseY, baseSize, baseSize);
+    ctx.fillStyle = "#3a4632";
+    ctx.fillRect(baseX, baseY, baseSize, baseSize);
+    ctx.strokeStyle = "#1f2818";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(baseX + 1, baseY + 1, baseSize - 2, baseSize - 2);
+    const cxA = baseX + baseSize / 2, cyA = baseY + baseSize / 2;
+    // Hub
+    ctx.fillStyle = "#1a1a1a";
+    ctx.beginPath();
+    ctx.arc(cxA, cyA, 16, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#444";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    // Long barrel — extends well past the 3×3 base.
+    const barrelLen = 4 * TILE;
+    const ang = b.barrelAngle;
+    ctx.strokeStyle = "rgba(0,0,0,0.45)";
+    ctx.lineWidth = 9;
+    ctx.beginPath();
+    ctx.moveTo(cxA + 2, cyA + 3);
+    ctx.lineTo(cxA + Math.cos(ang) * barrelLen + 2, cyA + Math.sin(ang) * barrelLen + 3);
+    ctx.stroke();
+    ctx.strokeStyle = "#bbb";
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    ctx.moveTo(cxA, cyA);
+    ctx.lineTo(cxA + Math.cos(ang) * barrelLen, cyA + Math.sin(ang) * barrelLen);
+    ctx.stroke();
+    // Muzzle cap
+    ctx.fillStyle = "#222";
+    ctx.beginPath();
+    ctx.arc(cxA + Math.cos(ang) * barrelLen, cyA + Math.sin(ang) * barrelLen, 4, 0, Math.PI * 2);
+    ctx.fill();
+    // Buffers (heavy ammo dots top-left, ore dots top-right)
+    ctx.fillStyle = "#ff8800";
+    for (let i = 0; i < Math.min(10, b.ammoBuf || 0); i++) ctx.fillRect(baseX + 3 + i * 5, baseY + 3, 4, 4);
+    ctx.fillStyle = "#c0c0c0";
+    for (let i = 0; i < Math.min(10, b.buffer || 0); i++) ctx.fillRect(baseX + 3 + i * 5, baseY + baseSize - 7, 3, 3);
+  } else if (b.type === BTYPE.SNIPER_TURRET) {
+    // 1x1 base
+    ctx.fillStyle = "#444";
+    ctx.fillRect(px, py, TILE, TILE);
+    ctx.strokeStyle = "#222";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(px + 1, py + 1, TILE - 2, TILE - 2);
+    const cx = px + TILE/2, cy = py + TILE/2;
+    // Barrel: 2 tiles long, drawn HIGH (after base, no occlusion). Recoil pulls it back briefly.
+    const recoilFrac = b.recoilT > 0 ? b.recoilT / SNIPER_RECOIL_MS : 0;
+    const recoilOffset = -recoilFrac * 6; // pull back when recoiling
+    const ang = b.barrelAngle;
+    const baseX = cx + Math.cos(ang) * recoilOffset;
+    const baseY = cy + Math.sin(ang) * recoilOffset;
+    const tipX = baseX + Math.cos(ang) * (TILE * 2);
+    const tipY = baseY + Math.sin(ang) * (TILE * 2);
+    // shadow under barrel for "high" feel
+    ctx.strokeStyle = "rgba(0,0,0,0.35)";
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(baseX + 2, baseY + 3);
+    ctx.lineTo(tipX + 2, tipY + 3);
+    ctx.stroke();
+    // barrel
+    ctx.strokeStyle = "#cccccc";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(baseX, baseY);
+    ctx.lineTo(tipX, tipY);
+    ctx.stroke();
+    // muzzle tip
+    ctx.fillStyle = "#222";
+    ctx.beginPath();
+    ctx.arc(tipX, tipY, 3, 0, Math.PI * 2);
+    ctx.fill();
+    // turret head
+    ctx.fillStyle = "#222";
+    ctx.beginPath();
+    ctx.arc(baseX, baseY, 6, 0, Math.PI * 2);
+    ctx.fill();
+    // muzzle flash on fresh recoil
+    if (recoilFrac > 0.6) {
+      ctx.fillStyle = "#ffeebb";
+      ctx.beginPath();
+      ctx.arc(tipX, tipY, 5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // ammo dots (orange)
+    ctx.fillStyle = "#ff8800";
+    for (let i = 0; i < b.ammo; i++) ctx.fillRect(px + 2 + i*5, py + 2, 4, 4);
+  } else if (b.type === BTYPE.HEAVY_TURRET) {
+    ctx.fillStyle = "#3a3a3a";
+    ctx.fillRect(px, py, TILE, TILE);
+    // outer plating
+    ctx.strokeStyle = "#222";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(px + 1, py + 1, TILE - 2, TILE - 2);
+    const cx = px + TILE/2, cy = py + TILE/2;
+    ctx.fillStyle = "#111";
+    ctx.beginPath();
+    ctx.arc(cx, cy, 8, 0, Math.PI * 2);
+    ctx.fill();
+    // double barrel
+    ctx.strokeStyle = "#ddd";
+    ctx.lineWidth = 4;
+    const ang = b.barrelAngle;
+    const ox = -Math.sin(ang) * 2, oy = Math.cos(ang) * 2;
+    ctx.beginPath();
+    ctx.moveTo(cx + ox, cy + oy);
+    ctx.lineTo(cx + ox + Math.cos(ang) * 12, cy + oy + Math.sin(ang) * 12);
+    ctx.moveTo(cx - ox, cy - oy);
+    ctx.lineTo(cx - ox + Math.cos(ang) * 12, cy - oy + Math.sin(ang) * 12);
+    ctx.stroke();
+    // ammo dots (orange)
+    ctx.fillStyle = "#ff8800";
+    const dots = Math.min(5, Math.ceil(b.ammo / 10));
+    for (let i = 0; i < dots; i++) ctx.fillRect(px + 2 + i*4, py + 2, 3, 3);
+  } else if (b.type === BTYPE.RAIL) {
+    drawRailTile(b, px, py);
+  } else if (b.type === BTYPE.STATION) {
+    // Only draw the full station ONCE (when this is the anchor cell).
+    if (b.x === px / TILE && b.y === py / TILE) {
+      const cells = b.cells || [{ x: b.x, y: b.y }];
+      // Determine bounding box
+      let xMinT = Infinity, yMinT = Infinity, xMaxT = -Infinity, yMaxT = -Infinity;
+      for (const c of cells) {
+        if (c.x < xMinT) xMinT = c.x;
+        if (c.y < yMinT) yMinT = c.y;
+        if (c.x > xMaxT) xMaxT = c.x;
+        if (c.y > yMaxT) yMaxT = c.y;
+      }
+      const sx = xMinT * TILE, sy = yMinT * TILE;
+      const sw = (xMaxT - xMinT + 1) * TILE, sh = (yMaxT - yMinT + 1) * TILE;
+      ctx.fillStyle = "#3b3026";
+      ctx.fillRect(sx, sy, sw, sh);
+      // Two parallel rails along the long axis
+      const horizontal = sw > sh;
+      ctx.strokeStyle = "#cccccc";
+      ctx.lineWidth = 2;
+      if (horizontal) {
+        ctx.beginPath();
+        ctx.moveTo(sx, sy + 7); ctx.lineTo(sx + sw, sy + 7);
+        ctx.moveTo(sx, sy + sh - 7); ctx.lineTo(sx + sw, sy + sh - 7);
+        ctx.stroke();
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(sx + 7, sy); ctx.lineTo(sx + 7, sy + sh);
+        ctx.moveTo(sx + sw - 7, sy); ctx.lineTo(sx + sw - 7, sy + sh);
+        ctx.stroke();
+      }
+      // Roof outline
+      ctx.strokeStyle = "#ffd700"; ctx.lineWidth = 2;
+      ctx.strokeRect(sx + 1, sy + 1, sw - 2, sh - 2);
+      // Name above
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 11px ui-monospace, Consolas, monospace";
+      ctx.textBaseline = "bottom";
+      ctx.lineWidth = 3; ctx.strokeStyle = "#000";
+      ctx.strokeText(b.name || "Station", sx + 4, sy - 2);
+      ctx.fillText(b.name || "Station", sx + 4, sy - 2);
+      ctx.textBaseline = "top";
+    }
+  } else if (b.type === BTYPE.SPLITTER) {
+    ctx.fillStyle = "#3a5a7a";
+    ctx.fillRect(px, py, TILE, TILE);
+    ctx.strokeStyle = "#88ccff";
+    ctx.lineWidth = 2;
+    const cx = px + TILE/2, cy = py + TILE/2;
+    // Y-shape: arrows to all 4 sides faintly, item dot in center
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(px + 4, py + 4);
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(px + TILE - 4, py + 4);
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(px + 4, py + TILE - 4);
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(px + TILE - 4, py + TILE - 4);
+    ctx.stroke();
+    if (b.item != null) drawItem(cx, cy, b.item);
+  } else if (b.type === BTYPE.UNDERGROUND_BELT) {
+    const r = undergroundRole(b);
+    ctx.fillStyle = "#2a2a2a";
+    ctx.fillRect(px, py, TILE, TILE);
+    // tunnel mouth (small dark circle on the entering/exiting end)
+    ctx.fillStyle = "#000";
+    const cx = px + TILE/2, cy = py + TILE/2;
+    let holeX = cx, holeY = cy;
+    if (r.role === "entry") { holeX = cx + DX[b.dir]*7; holeY = cy + DY[b.dir]*7; }
+    else if (r.role === "exit") { holeX = cx - DX[b.dir]*7; holeY = cy - DY[b.dir]*7; }
+    ctx.beginPath();
+    ctx.arc(holeX, holeY, 5, 0, Math.PI * 2);
+    ctx.fill();
+    // arrow showing direction; tinted by role
+    let arrowColor = "#888";
+    if (r.role === "entry") arrowColor = "#ffd700";
+    else if (r.role === "exit") arrowColor = "#7fff7f";
+    ctx.fillStyle = arrowColor;
+    drawArrow(cx - DX[b.dir]*3, cy - DY[b.dir]*3, b.dir, 5);
+    if (b.item != null) drawItem(cx, cy, b.item);
+  } else if (b.type === BTYPE.WALL) {
+    ctx.fillStyle = COL.wall;
+    ctx.fillRect(px, py, TILE, TILE);
+    ctx.strokeStyle = "#555";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(px, py + 8); ctx.lineTo(px + TILE, py + 8);
+    ctx.moveTo(px, py + 16); ctx.lineTo(px + TILE, py + 16);
+    ctx.stroke();
+    // hp bar
+    if (b.hp < WALL_HP) {
+      ctx.fillStyle = "#400"; ctx.fillRect(px+2, py+TILE-4, TILE-4, 2);
+      ctx.fillStyle = "#0c0"; ctx.fillRect(px+2, py+TILE-4, (TILE-4) * (b.hp / WALL_HP), 2);
+    }
+  }
+}
+
+function drawArrow(cx, cy, dir, size) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(DIR_RAD[dir]);
+  ctx.beginPath();
+  ctx.moveTo(size, 0);
+  ctx.lineTo(-size*0.6, -size*0.7);
+  ctx.lineTo(-size*0.6, size*0.7);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawItem(x, y, type) {
+  if (type === ITEM.SHELL) {
+    // Pointed brass cartridge.
+    ctx.fillStyle = "#b8893a";
+    ctx.beginPath();
+    ctx.arc(x, y, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#3a2a10";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = "#3a2a10";
+    ctx.fillRect(x - 1, y - 3, 2, 2);
+    return;
+  }
+  if (type === ITEM.HEAVY_AMMO) {
+    ctx.fillStyle = "#ff8800";
+    ctx.beginPath();
+    ctx.arc(x, y, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#552200";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = "#ffd700";
+    ctx.fillRect(x - 1, y - 1, 2, 2);
+    return;
+  }
+  ctx.fillStyle = type === ITEM.ORE ? COL.ore : COL.ammo;
+  ctx.beginPath();
+  ctx.arc(x, y, 4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(0,0,0,0.5)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+}
+
+function drawPlayer() {
+  drawShadow(player.x - 10, player.y - 10, 20, 20);
+  ctx.fillStyle = COL.player;
+  ctx.beginPath();
+  ctx.arc(player.x, player.y, 10, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = COL.playerOutline;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  // facing triangle
+  ctx.fillStyle = COL.playerOutline;
+  drawArrow(player.x + DX[player.facing]*8, player.y + DY[player.facing]*8, player.facing, 4);
+}
+
+function drawZombies() {
+  // Cull zombies outside the camera viewport (with a small margin) — most of a 1k+ horde
+  // is off-screen at any given time and was being drawn for nothing.
+  const cullX0 = camX - TILE * 2, cullY0 = camY - TILE * 2;
+  const cullX1 = camX + VIEW_W + TILE * 2, cullY1 = camY + VIEW_H + TILE * 2;
+  for (const z of zombies) {
+    if (z.x < cullX0 || z.x > cullX1 || z.y < cullY0 || z.y > cullY1) continue;
+    const alpha = z.dead ? Math.max(0, z.fade / 400) : 1;
+    ctx.globalAlpha = alpha;
+    drawShadow(z.x - 9, z.y - 9, 18, 18);
+    ctx.fillStyle = z.isBoss ? "#a83838" : COL.zombie;
+    const bobY = z.dead ? 0 : Math.sin(z.bob) * 1.5;
+    ctx.beginPath();
+    ctx.arc(z.x, z.y + bobY, 9, 0, Math.PI * 2);
+    ctx.fill();
+    if (z.isBoss && !z.dead) {
+      ctx.strokeStyle = "#ff7777";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+    ctx.fillStyle = COL.zombieEye;
+    ctx.fillRect(z.x - 4, z.y - 2 + bobY, 2, 2);
+    ctx.fillRect(z.x + 2, z.y - 2 + bobY, 2, 2);
+    // hp
+    if (!z.dead && z.hp < ZOMBIE_HP) {
+      ctx.fillStyle = "#400"; ctx.fillRect(z.x-9, z.y-14, 18, 2);
+      ctx.fillStyle = "#0c0"; ctx.fillRect(z.x-9, z.y-14, 18 * (z.hp/ZOMBIE_HP), 2);
+    }
+    ctx.globalAlpha = 1;
+  }
+}
+
+function drawShells() {
+  // In-flight shells — bright projectile with a glowing tracer tail so they're easy to track.
+  const cullX0 = camX - TILE * 4, cullY0 = camY - TILE * 4;
+  const cullX1 = camX + VIEW_W + TILE * 4, cullY1 = camY + VIEW_H + TILE * 4;
+  for (const s of shells) {
+    if (s.x < cullX0 || s.x > cullX1 || s.y < cullY0 || s.y > cullY1) continue;
+    // Long faint outer trail
+    ctx.strokeStyle = "rgba(255,160,40,0.45)";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(s.x - s.vx * 60, s.y - s.vy * 60);
+    ctx.lineTo(s.x, s.y);
+    ctx.stroke();
+    // Bright inner trail
+    ctx.strokeStyle = "rgba(255,235,140,0.95)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(s.x - s.vx * 30, s.y - s.vy * 30);
+    ctx.lineTo(s.x, s.y);
+    ctx.stroke();
+    // Projectile body
+    ctx.fillStyle = "#1a1a1a";
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawExplosions() {
+  for (const e of explosions) {
+    const t = 1 - e.life / e.maxLife; // 0 → 1 over life
+    const r = e.radius * (0.4 + 0.6 * t);
+    const alpha = 1 - t;
+    ctx.globalAlpha = alpha;
+    // outer fireball
+    ctx.fillStyle = "#ff7a1f";
+    ctx.beginPath(); ctx.arc(e.x, e.y, r, 0, Math.PI * 2); ctx.fill();
+    // inner core
+    ctx.fillStyle = "#ffe080";
+    ctx.beginPath(); ctx.arc(e.x, e.y, r * 0.55, 0, Math.PI * 2); ctx.fill();
+    // dark smoke ring
+    ctx.strokeStyle = "rgba(40,20,10,0.5)";
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(e.x, e.y, r * 1.05, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+}
+
+function drawPlayerBullets() {
+  const cullX0 = camX - TILE * 2, cullY0 = camY - TILE * 2;
+  const cullX1 = camX + VIEW_W + TILE * 2, cullY1 = camY + VIEW_H + TILE * 2;
+  ctx.lineCap = "round";
+  for (const b of playerBullets) {
+    if (b.x < cullX0 || b.x > cullX1 || b.y < cullY0 || b.y > cullY1) continue;
+    // Yellow tracer line drawn opposite to velocity (so the bullet's "head" leads).
+    const speed = Math.hypot(b.vx, b.vy) || 1;
+    const tailLen = TILE * 0.6;
+    const tailX = b.x - (b.vx / speed) * tailLen;
+    const tailY = b.y - (b.vy / speed) * tailLen;
+    ctx.strokeStyle = "rgba(255, 215, 60, 0.6)";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(tailX, tailY);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+    ctx.fillStyle = "#fff7a8";
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.lineCap = "butt";
+}
+
+function drawBullets() {
+  ctx.strokeStyle = COL.bullet;
+  ctx.lineWidth = 2;
+  for (const b of bullets) {
+    const a = b.life / 80;
+    ctx.globalAlpha = a;
+    ctx.beginPath();
+    ctx.moveTo(b.x1, b.y1);
+    ctx.lineTo(b.x2, b.y2);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawPlacementPreview() {
+  // Rail tool has its own preview elsewhere.
+  if (selectedBuilding === BTYPE.RAIL) return;
+  if (!inBounds(mouseTileX, mouseTileY)) return;
+  const cells = footprintCells(selectedBuilding, mouseTileX, mouseTileY, placementDir);
+  // Validity: every cell in-bounds and unoccupied; for miners the anchor must have ore;
+  // for stations max 2 cap.
+  let valid = true;
+  for (const c of cells) {
+    if (!inBounds(c.x, c.y)) { valid = false; break; }
+    if (buildingAt(c.x, c.y)) { valid = false; break; }
+  }
+  if (selectedBuilding === BTYPE.MINER && oreAt(mouseTileX, mouseTileY) <= 0) valid = false;
+  if (selectedBuilding === BTYPE.STATION && stations.length >= MAX_STATIONS) valid = false;
+  // Ghost render of the building (for 1×1 only).
+  if (cells.length === 1) {
+    ctx.globalAlpha = 0.5;
+    const fake = { type: selectedBuilding, x: mouseTileX, y: mouseTileY, dir: placementDir,
+                   item: null, itemProgress: 0, ammo: 0, hp: WALL_HP, barrelAngle: DIR_RAD[placementDir],
+                   cells };
+    drawBuilding(fake);
+    ctx.globalAlpha = 1;
+  } else {
+    // Multi-tile (e.g. station): tinted fill across all footprint cells
+    ctx.fillStyle = valid ? "rgba(127,255,127,0.18)" : "rgba(255,85,85,0.22)";
+    for (const c of cells) ctx.fillRect(c.x * TILE, c.y * TILE, TILE, TILE);
+  }
+  // Outline rect across the full bounding box of the footprint.
+  let xMinT = Infinity, yMinT = Infinity, xMaxT = -Infinity, yMaxT = -Infinity;
+  for (const c of cells) {
+    if (c.x < xMinT) xMinT = c.x;
+    if (c.y < yMinT) yMinT = c.y;
+    if (c.x > xMaxT) xMaxT = c.x;
+    if (c.y > yMaxT) yMaxT = c.y;
+  }
+  ctx.strokeStyle = valid ? "#7fff7f" : "#ff5555";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(xMinT * TILE, yMinT * TILE, (xMaxT - xMinT + 1) * TILE, (yMaxT - yMinT + 1) * TILE);
+}
+
+// ============================================================
+// UI
+// ============================================================
+function drawText(text, x, y, size, color) {
+  ctx.font = size + "px ui-monospace, Consolas, monospace";
+  ctx.textBaseline = "top";
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = "#000";
+  ctx.strokeText(text, x, y);
+  ctx.fillStyle = color || "#fff";
+  ctx.fillText(text, x, y);
+}
+
+function drawHotbarIcon(type, x, y, size) {
+  const px = x, py = y;
+  const fake = { type, x: 0, y: 0, dir: DIR.RIGHT, item: null, itemProgress: 0, ammo: 0, hp: WALL_HP, barrelAngle: 0 };
+  ctx.save();
+  ctx.translate(px - 0, py - 0);
+  ctx.scale(size/TILE, size/TILE);
+  // shift to origin
+  ctx.translate(0, 0);
+  // We'll draw at tile (0,0)
+  ctx.restore();
+  // Simpler: draw colored rect with letter
+  const colorMap = { [BTYPE.MINER]: COL.miner, [BTYPE.BELT]: COL.belt, [BTYPE.ASSEMBLER]: COL.assembler, [BTYPE.TURRET]: COL.turret, [BTYPE.WALL]: COL.wall, [BTYPE.SPLITTER]: "#3a5a7a", [BTYPE.HEAVY_TURRET]: "#3a3a3a", [BTYPE.UNDERGROUND_BELT]: "#2a2a2a", [BTYPE.SNIPER_TURRET]: "#444", [BTYPE.RAIL]: "#3b3026", [BTYPE.STATION]: "#5a4a36", [BTYPE.ARTILLERY]: "#3a4632", [BTYPE.HEAVY_ASSEMBLER]: "#7a3a18", [BTYPE.BIG_DRILL]: "#6a4a26" };
+  ctx.fillStyle = colorMap[type];
+  ctx.fillRect(px, py, size, size);
+  const labels = { [BTYPE.MINER]: "M", [BTYPE.BELT]: "B", [BTYPE.ASSEMBLER]: "A", [BTYPE.TURRET]: "T", [BTYPE.WALL]: "W", [BTYPE.SPLITTER]: "S", [BTYPE.HEAVY_TURRET]: "H", [BTYPE.UNDERGROUND_BELT]: "U", [BTYPE.SNIPER_TURRET]: "Sn", [BTYPE.RAIL]: "R", [BTYPE.STATION]: "St", [BTYPE.ARTILLERY]: "Ar", [BTYPE.HEAVY_ASSEMBLER]: "HA", [BTYPE.BIG_DRILL]: "BD" };
+  drawText(labels[type], px + size/2 - 5, py + size/2 - 8, 16, "#fff");
+}
+
+function drawMapView(mx, my, mw, mh, opts) {
+  opts = opts || {};
+  const oreSource = opts.oreGrid || null; // 2D grid of ore counts; if null, use tiles
+  const showEntities = opts.showEntities !== false;
+  // sx/sy convert WORLD PIXELS -> map pixels
+  // Active region (in tile coords) the map represents. For the world preview we render the buffer-shaped
+  // grid but limit visible cells to the initial active region.
+  const aXMin = (opts.bounds && opts.bounds.xMin) != null ? opts.bounds.xMin : xMin;
+  const aYMin = (opts.bounds && opts.bounds.yMin) != null ? opts.bounds.yMin : yMin;
+  const aXMax = (opts.bounds && opts.bounds.xMax) != null ? opts.bounds.xMax : xMax;
+  const aYMax = (opts.bounds && opts.bounds.yMax) != null ? opts.bounds.yMax : yMax;
+  const aW = (aXMax - aXMin) * TILE;
+  const aH = (aYMax - aYMin) * TILE;
+  const sx = mw / aW;
+  const sy = mh / aH;
+  const tileW = TILE * sx;
+  const tileH = TILE * sy;
+  // background
+  ctx.fillStyle = "rgba(0,0,0,0.85)";
+  ctx.fillRect(mx - 2, my - 2, mw + 4, mh + 4);
+  ctx.fillStyle = "#1c2419";
+  ctx.fillRect(mx, my, mw, mh);
+  // Clip everything else to the map area so pan/zoom can show partial tiles cleanly.
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(mx, my, mw, mh);
+  ctx.clip();
+  // Iterate integer tile cells visible within the (possibly fractional) bounds.
+  const tx0 = Math.max(0, Math.floor(aXMin));
+  const ty0 = Math.max(0, Math.floor(aYMin));
+  const tx1 = Math.min(WORLD_MAX_COLS, Math.ceil(aXMax));
+  const ty1 = Math.min(WORLD_MAX_ROWS, Math.ceil(aYMax));
+  // ore — bright so it pops on the map
+  ctx.fillStyle = "#c8d8ec";
+  for (let y = ty0; y < ty1; y++) {
+    for (let x = tx0; x < tx1; x++) {
+      const v = oreSource ? oreSource[y * WORLD_MAX_COLS + x] : oreAt(x, y);
+      if (v > 0) {
+        ctx.fillRect(mx + (x - aXMin)*tileW, my + (y - aYMin)*tileH, Math.max(1.5, tileW), Math.max(1.5, tileH));
+      }
+    }
+  }
+  if (!showEntities) {
+    ctx.restore();
+    ctx.strokeStyle = "#555";
+    ctx.strokeRect(mx, my, mw, mh);
+    return;
+  }
+  // buildings
+  const bcol = {
+    [BTYPE.MINER]: "#d4a96a",
+    [BTYPE.BELT]: "#aaa",
+    [BTYPE.ASSEMBLER]: "#d27a4a",
+    [BTYPE.TURRET]: "#ffffff",
+    [BTYPE.WALL]: "#c0c0c0",
+    [BTYPE.SPLITTER]: "#88ccff",
+    [BTYPE.HEAVY_TURRET]: "#ffffff",
+    [BTYPE.UNDERGROUND_BELT]: "#666",
+    [BTYPE.SNIPER_TURRET]: "#cccccc",
+    [BTYPE.RAIL]: "#7a7a7a",
+    [BTYPE.STATION]: "#d4a96a",
+    [BTYPE.ARTILLERY]: "#5a7a3a",
+    [BTYPE.HEAVY_ASSEMBLER]: "#a85a28",
+    [BTYPE.BIG_DRILL]: "#d8a060",
+  };
+  const bSeen = new Set();
+  for (const b of buildings.values()) {
+    if (bSeen.has(b)) continue;
+    bSeen.add(b);
+    // Get this building's full bounding box (multi-tile buildings render at full size).
+    const cells = b.cells || [{ x: b.x, y: b.y }];
+    let bxMin = Infinity, byMin = Infinity, bxMax = -Infinity, byMax = -Infinity;
+    for (const c of cells) {
+      if (c.x < bxMin) bxMin = c.x;
+      if (c.y < byMin) byMin = c.y;
+      if (c.x > bxMax) bxMax = c.x;
+      if (c.y > byMax) byMax = c.y;
+    }
+    if (bxMax < tx0 - 1 || bxMin > tx1 || byMax < ty0 - 1 || byMin > ty1) continue;
+    ctx.fillStyle = bcol[b.type] || "#fff";
+    const bw = (bxMax - bxMin + 1) * tileW;
+    const bh = (byMax - byMin + 1) * tileH;
+    ctx.fillRect(mx + (bxMin - aXMin) * tileW, my + (byMin - aYMin) * tileH,
+                 Math.max(1.5, bw), Math.max(1.5, bh));
+  }
+  // Depleted-miner markers: pulsing red dot on any miner whose ore tile is exhausted.
+  // Same pulse cadence as the in-world badge on miners.
+  const minerPulse = 0.6 + 0.4 * Math.sin(performance.now() / 200);
+  ctx.globalAlpha = minerPulse;
+  ctx.fillStyle = "#ff4040";
+  for (const b of bSeen) {
+    let isDepleted = false;
+    let cx = 0, cy = 0;
+    if (b.type === BTYPE.MINER) {
+      if (oreAt(b.x, b.y) > 0) continue;
+      isDepleted = true;
+      cx = b.x + 0.5;
+      cy = b.y + 0.5;
+    } else if (b.type === BTYPE.BIG_DRILL) {
+      if (!bigDrillDepleted(b)) continue;
+      isDepleted = true;
+      cx = b.x + 1.5;
+      cy = b.y + 1.5;
+    } else {
+      continue;
+    }
+    if (!isDepleted) continue;
+    if (b.x + 2 < tx0 - 1 || b.x > tx1 || b.y + 2 < ty0 - 1 || b.y > ty1) continue;
+    const dxp = mx + (cx - aXMin) * tileW;
+    const dyp = my + (cy - aYMin) * tileH;
+    const r = b.type === BTYPE.BIG_DRILL ? Math.max(8, tileW * 2.5) : Math.max(5, tileW * 1.4);
+    ctx.beginPath();
+    ctx.arc(dxp, dyp, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // Turret range circles — only on the full map (where labels are on) so the minimap stays clean.
+  if (opts.showLabels) {
+    for (const b of bSeen) {
+      let range = 0, minRange = 0, color = null;
+      let bcx = b.x, bcy = b.y; // tile-coord center of turret
+      if (b.type === BTYPE.TURRET)         { range = TURRET_RANGE;        color = "rgba(255, 215,  60, 0.10)"; }
+      else if (b.type === BTYPE.HEAVY_TURRET) { range = TURRET_RANGE;        color = "rgba(255, 130,   0, 0.10)"; }
+      else if (b.type === BTYPE.SNIPER_TURRET){ range = SNIPER_TURRET_RANGE; color = "rgba(120, 220, 255, 0.08)"; }
+      else if (b.type === BTYPE.ARTILLERY)  {
+        range = ARTILLERY_RANGE; minRange = ARTILLERY_MIN_RANGE;
+        color = "rgba(255,  90,  60, 0.07)";
+        bcx = b.x + 1.5; bcy = b.y + 1.5; // 3x3 center
+      } else continue;
+      if (range <= 0) continue;
+      const rcx = mx + (bcx + 0.5 - aXMin) * tileW;
+      const rcy = my + (bcy + 0.5 - aYMin) * tileH;
+      // Convert pixel range to map pixels.
+      const rPx = range * sx;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(rcx, rcy, rPx, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = color.replace(/0\.\d+\)/, "0.45)");
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      if (minRange > 0) {
+        // Inner "dead zone" cutout — translucent darker circle.
+        const minPx = minRange * sx;
+        ctx.fillStyle = "rgba(0, 0, 0, 0.18)";
+        ctx.beginPath();
+        ctx.arc(rcx, rcy, minPx, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255, 90, 60, 0.45)";
+        ctx.beginPath();
+        ctx.arc(rcx, rcy, minPx, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+  }
+
+  // Station outlines (and names if labels are on) — draw on top of the per-tile fill so they
+  // read clearly at any zoom.
+  for (const s of stations) {
+    const sc = s.cells || [{ x: s.x, y: s.y }];
+    let sxMinT = Infinity, syMinT = Infinity, sxMaxT = -Infinity, syMaxT = -Infinity;
+    for (const c of sc) {
+      if (c.x < sxMinT) sxMinT = c.x;
+      if (c.y < syMinT) syMinT = c.y;
+      if (c.x > sxMaxT) sxMaxT = c.x;
+      if (c.y > syMaxT) syMaxT = c.y;
+    }
+    const ox = mx + (sxMinT - aXMin) * tileW;
+    const oy = my + (syMinT - aYMin) * tileH;
+    const ow = (sxMaxT - sxMinT + 1) * tileW;
+    const oh = (syMaxT - syMinT + 1) * tileH;
+    ctx.fillStyle = "#d4a96a";
+    ctx.fillRect(ox, oy, Math.max(2, ow), Math.max(2, oh));
+    ctx.strokeStyle = "#ffd700";
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(ox, oy, Math.max(2, ow), Math.max(2, oh));
+    if (opts.showLabels && s.name) {
+      ctx.font = "bold 11px ui-monospace, Consolas, monospace";
+      ctx.textBaseline = "bottom";
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "#000";
+      ctx.strokeText(s.name, ox, oy - 2);
+      ctx.fillStyle = "#ffd700";
+      ctx.fillText(s.name, ox, oy - 2);
+      ctx.textBaseline = "top";
+    }
+  }
+  // zombies
+  ctx.fillStyle = "#ff4444";
+  for (const z of zombies) {
+    if (z.dead) continue;
+    ctx.fillRect(mx + (z.x - aXMin*TILE)*sx - 1.5, my + (z.y - aYMin*TILE)*sy - 1.5, 3, 3);
+  }
+  // player
+  ctx.fillStyle = COL.player;
+  ctx.fillRect(mx + (player.x - aXMin*TILE)*sx - 2.5, my + (player.y - aYMin*TILE)*sy - 2.5, 5, 5);
+  // train marker
+  if (train) {
+    let trainPos = null;
+    if (train.pathCells && train.pathCells.length >= 2) {
+      trainPos = pathPositionAt(train.pathCells, train.pathProgress);
+    } else if (train.parkedStationIndex != null && stations[train.parkedStationIndex]) {
+      const s = stations[train.parkedStationIndex];
+      trainPos = { x: s.x * TILE + TILE/2, y: s.y * TILE + TILE/2 };
+    }
+    if (trainPos) {
+      const tmx = mx + (trainPos.x - aXMin*TILE) * sx;
+      const tmy = my + (trainPos.y - aYMin*TILE) * sy;
+      // Locomotive dot + storage dot for clarity
+      ctx.fillStyle = "#a87a44";
+      ctx.beginPath(); ctx.arc(tmx, tmy, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "#000"; ctx.lineWidth = 1; ctx.stroke();
+    }
+  }
+  // shells in flight — bright orange dot with a high-contrast tracer that's visible at any zoom.
+  for (const sh of shells) {
+    const sx2 = mx + (sh.x - aXMin*TILE) * sx;
+    const sy2 = my + (sh.y - aYMin*TILE) * sy;
+    // Trail length is independent of scale so it's still visible on the minimap.
+    const dx = sh.vx, dy = sh.vy;
+    const len = Math.hypot(dx, dy) || 1;
+    const trailLen = Math.max(20, 60 * sx); // at least 20 px regardless of scale
+    const tdx = dx / len * trailLen;
+    const tdy = dy / len * trailLen;
+    ctx.strokeStyle = "rgba(255,140,40,0.85)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(sx2 - tdx, sy2 - tdy);
+    ctx.lineTo(sx2, sy2);
+    ctx.stroke();
+    ctx.fillStyle = "#ffe080";
+    ctx.beginPath(); ctx.arc(sx2, sy2, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#000";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+  // explosions — bright fireball, minimum 8 px on the map so they're always visible.
+  for (const e of explosions) {
+    const t = 1 - e.life / e.maxLife;
+    const r = Math.max(8, e.radius * (0.4 + 0.6 * t) * sx);
+    const alpha = 1 - t * 0.6; // fade slower so they linger visually
+    const ex2 = mx + (e.x - aXMin*TILE) * sx;
+    const ey2 = my + (e.y - aYMin*TILE) * sy;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = "#ff7a1f";
+    ctx.beginPath(); ctx.arc(ex2, ey2, r, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#ffe080";
+    ctx.beginPath(); ctx.arc(ex2, ey2, r * 0.55, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "rgba(0,0,0,0.4)";
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(ex2, ey2, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  // viewport rectangle
+  ctx.strokeStyle = COL.selected;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(mx + (camX - aXMin*TILE)*sx, my + (camY - aYMin*TILE)*sy, VIEW_W*sx, VIEW_H*sy);
+  ctx.restore();
+  // border
+  ctx.strokeStyle = "#555";
+  ctx.strokeRect(mx, my, mw, mh);
+}
+
+const hudWaveNum = document.getElementById("hudWaveNum");
+const hudWaveSub = document.getElementById("hudWaveSub");
+const hudHpFill = document.getElementById("hudHpFill");
+const hudHpLabel = document.getElementById("hudHpLabel");
+const hudSkipBtn = document.getElementById("hudSkipBtn");
+const hudTrain = document.getElementById("hudTrain");
+const scheduleModal = document.getElementById("scheduleModal");
+const schStop1Station = document.getElementById("schStop1Station");
+const schStop2Station = document.getElementById("schStop2Station");
+const schStop1Cond = document.getElementById("schStop1Cond");
+const schStop2Cond = document.getElementById("schStop2Cond");
+const schSaveBtn = document.getElementById("schSaveBtn");
+const schCloseBtn = document.getElementById("schCloseBtn");
+
+function openScheduleModal() {
+  if (!train) ensureTrain();
+  if (!train) { showToast("Need 2 stations first"); return; }
+  // Populate station dropdowns
+  schStop1Station.innerHTML = "";
+  schStop2Station.innerHTML = "";
+  for (let i = 0; i < stations.length; i++) {
+    const opt1 = document.createElement("option"); opt1.value = i; opt1.textContent = stations[i].name; schStop1Station.appendChild(opt1);
+    const opt2 = document.createElement("option"); opt2.value = i; opt2.textContent = stations[i].name; schStop2Station.appendChild(opt2);
+  }
+  schStop1Station.value = train.schedule[0].stationIndex;
+  schStop2Station.value = train.schedule[1].stationIndex;
+  schStop1Cond.value = train.schedule[0].condition;
+  schStop2Cond.value = train.schedule[1].condition;
+  scheduleModal.classList.add("open");
+  scheduleModalOpen = true;
+}
+function closeScheduleModal() {
+  scheduleModal.classList.remove("open");
+  scheduleModalOpen = false;
+}
+schCloseBtn.addEventListener("click", closeScheduleModal);
+// ============================================================
+// Blueprints
+// ============================================================
+const blueprintModal = document.getElementById("blueprintModal");
+const blueprintList = document.getElementById("blueprintList");
+const bpCloseBtn = document.getElementById("bpCloseBtn");
+const bpCreateBtn = document.getElementById("bpCreateBtn");
+
+function openBlueprintModal() {
+  if (blueprintCapture || blueprintPlace) return;
+  blueprintList.innerHTML = "";
+  if (blueprints.length === 0) {
+    const div = document.createElement("div");
+    div.className = "empty";
+    div.textContent = "(no blueprints yet)";
+    blueprintList.appendChild(div);
+  } else {
+    for (let i = 0; i < blueprints.length; i++) {
+      const li = document.createElement("li");
+      const name = document.createElement("button");
+      name.className = "bpName";
+      const sz = blueprints[i].items.length;
+      name.textContent = blueprints[i].name + " (" + sz + " bldg" + (sz === 1 ? "" : "s") + ")";
+      name.onclick = () => { blueprintPlace = blueprints[i]; closeBlueprintModal(); showToast("Click to place. B/right-click to cancel."); };
+      const del = document.createElement("button");
+      del.className = "bpDel";
+      del.textContent = "x";
+      del.onclick = () => { blueprints.splice(i, 1); openBlueprintModal(); };
+      li.appendChild(name); li.appendChild(del);
+      blueprintList.appendChild(li);
+    }
+  }
+  blueprintModal.classList.add("open");
+  blueprintModalOpen = true;
+}
+function closeBlueprintModal() {
+  blueprintModal.classList.remove("open");
+  blueprintModalOpen = false;
+}
+bpCloseBtn.addEventListener("click", closeBlueprintModal);
+bpCreateBtn.addEventListener("click", () => {
+  const name = (typeof prompt === "function" ? (prompt("Blueprint name?", "Blueprint " + (blueprints.length + 1)) || "") : "").trim();
+  if (!name) return;
+  blueprintCapture = { name, start: null };
+  closeBlueprintModal();
+  showToast("Click 1st corner of capture area");
+});
+
+// Capture all unique buildings whose anchor cell is inside the [x0..x1, y0..y1] rect.
+function buildBlueprintFromRect(x0, y0, x1, y1, name) {
+  const xLo = Math.min(x0, x1), xHi = Math.max(x0, x1);
+  const yLo = Math.min(y0, y1), yHi = Math.max(y0, y1);
+  const items = [];
+  const seen = new Set();
+  for (let y = yLo; y <= yHi; y++) {
+    for (let x = xLo; x <= xHi; x++) {
+      const b = buildingAt(x, y);
+      if (!b || seen.has(b)) continue;
+      // Only count buildings whose anchor is in the rect (avoid duplicating multi-tiles).
+      if (b.x < xLo || b.x > xHi || b.y < yLo || b.y > yHi) continue;
+      seen.add(b);
+      items.push({ t: b.type, dx: b.x - xLo, dy: b.y - yLo, dir: b.dir });
+    }
+  }
+  return { name, items };
+}
+
+// Returns true if all blueprint items fit in-bounds at the given anchor.
+function blueprintCanPlaceAt(bp, ax, ay) {
+  for (const it of bp.items) {
+    const cells = footprintCells(it.t, ax + it.dx, ay + it.dy, it.dir);
+    for (const c of cells) {
+      if (!inBounds(c.x, c.y)) return false;
+      if (buildingAt(c.x, c.y)) return false;
+    }
+  }
+  return true;
+}
+
+function placeBlueprintAt(bp, ax, ay) {
+  let placed = 0;
+  for (const it of bp.items) {
+    if (placeBuilding(it.t, ax + it.dx, ay + it.dy, it.dir)) placed++;
+  }
+  return placed;
+}
+
+schSaveBtn.addEventListener("click", () => {
+  if (train) {
+    train.schedule[0].stationIndex = parseInt(schStop1Station.value, 10);
+    train.schedule[1].stationIndex = parseInt(schStop2Station.value, 10);
+    train.schedule[0].condition = schStop1Cond.value;
+    train.schedule[1].condition = schStop2Cond.value;
+  }
+  closeScheduleModal();
+});
+
+function canSkipToNextWave() {
+  if (gameOver || paused) return false;
+  if (waveState.spawning) return false;
+  if (waveState.waveNumber > 0 && liveZombieCount() > 0) return false;
+  return true;
+}
+
+hudSkipBtn.addEventListener("click", () => {
+  if (!canSkipToNextWave()) return;
+  waveState.nextWaveAt = 0; // tickWaves will pick this up next frame
+});
+
+function updateHUD() {
+  // Mark upcoming or active boss waves (every 10th).
+  const upcomingBoss = ((waveState.waveNumber + 1) % 10 === 0);
+  hudWaveNum.textContent = waveState.bossWave
+    ? `${waveState.waveNumber} BOSS`
+    : (upcomingBoss && !waveState.spawning && (waveState.waveNumber === 0 || liveZombieCount() === 0))
+      ? `${waveState.waveNumber} (next: BOSS)`
+      : waveState.waveNumber;
+  const nextSec = Math.max(0, Math.ceil((waveState.spawning ? 0 : waveState.nextWaveAt) / 1000));
+  const live = liveZombieCount();
+  if (waveState.spawning) {
+    hudWaveSub.textContent = `Spawning ${waveState.spawned}/${waveState.spawnCount}`;
+  } else if (waveState.waveNumber > 0 && live > 0) {
+    hudWaveSub.textContent = `Defeat ${live} zombies`;
+  } else {
+    hudWaveSub.textContent = `Next in ${nextSec}s`;
+  }
+  const hpPct = Math.max(0, player.hp) / PLAYER_MAX_HP * 100;
+  hudHpFill.style.width = hpPct + "%";
+  hudHpLabel.textContent = `HP ${Math.max(0, Math.floor(player.hp))}/${PLAYER_MAX_HP}`;
+  hudSkipBtn.disabled = !canSkipToNextWave();
+  if (train) {
+    hudTrain.style.display = "block";
+    let where = "—";
+    if (train.status === "parked" && train.parkedStationIndex != null && stations[train.parkedStationIndex])
+      where = "parked at " + stations[train.parkedStationIndex].name;
+    else if (train.status === "moving") where = "in transit";
+    hudTrain.textContent = `Train: ${where} — ${train.inventory}/${TRAIN_INVENTORY_MAX}`;
+  } else {
+    hudTrain.style.display = "none";
+  }
+  hudSkipBtn.textContent = waveState.spawning
+    ? "Spawning..."
+    : (waveState.waveNumber > 0 && live > 0)
+      ? "Clear zombies first"
+      : `Start wave ${waveState.waveNumber + 1}`;
+}
+
+function drawUI() {
+  updateHUD();
+
+  // hotbar
+  const slotSize = 48;
+  const slots = 14;
+  const totalW = slots * slotSize + (slots-1) * 6;
+  const startX = (VIEW_W - totalW) / 2;
+  const y = VIEW_H - slotSize - 80;
+  for (let i = 0; i < slots; i++) {
+    const type = i + 1;
+    const x = startX + i * (slotSize + 6);
+    const locked = (type === BTYPE.HEAVY_TURRET && waveState.waveNumber < HEAVY_TURRET_UNLOCK_WAVE)
+                || (type === BTYPE.SNIPER_TURRET && waveState.waveNumber < SNIPER_TURRET_UNLOCK_WAVE)
+                || ((type === BTYPE.RAIL || type === BTYPE.STATION) && waveState.waveNumber < RAIL_UNLOCK_WAVE)
+                || (type === BTYPE.ARTILLERY && waveState.waveNumber < ARTILLERY_UNLOCK_WAVE)
+                || (type === BTYPE.HEAVY_ASSEMBLER && waveState.waveNumber < ARTILLERY_UNLOCK_WAVE)
+                || (type === BTYPE.BIG_DRILL && waveState.waveNumber < BIG_DRILL_UNLOCK_WAVE);
+    ctx.fillStyle = "rgba(0,0,0,0.6)";
+    ctx.fillRect(x, y, slotSize, slotSize);
+    drawHotbarIcon(type, x + 8, y + 8, slotSize - 16);
+    if (locked) {
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      ctx.fillRect(x, y, slotSize, slotSize);
+      let wv = HEAVY_TURRET_UNLOCK_WAVE;
+      if (type === BTYPE.SNIPER_TURRET) wv = SNIPER_TURRET_UNLOCK_WAVE;
+      else if (type === BTYPE.RAIL || type === BTYPE.STATION) wv = RAIL_UNLOCK_WAVE;
+      else if (type === BTYPE.ARTILLERY || type === BTYPE.HEAVY_ASSEMBLER) wv = ARTILLERY_UNLOCK_WAVE;
+      else if (type === BTYPE.BIG_DRILL) wv = BIG_DRILL_UNLOCK_WAVE;
+      drawText("W" + wv, x + 8, y + slotSize/2 - 6, 12, "#ff7777");
+    }
+    if (selectedBuilding === type) {
+      ctx.strokeStyle = COL.selected;
+      ctx.lineWidth = 3;
+      ctx.strokeRect(x, y, slotSize, slotSize);
+    } else {
+      ctx.strokeStyle = locked ? "#552222" : "#333";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x, y, slotSize, slotSize);
+    }
+    const keyLabel = type === BTYPE.RAIL ? "0" : type === BTYPE.STATION ? "-" : type === BTYPE.ARTILLERY ? "=" : type === BTYPE.HEAVY_ASSEMBLER ? "[" : type === BTYPE.BIG_DRILL ? "]" : String(type);
+    drawText(keyLabel, x + 4, y + 2, 12, "#ffd700");
+  }
+
+  // bottom-right counters
+  drawText(`Ore mined:     ${stats.oreMined}`, VIEW_W - 240, VIEW_H - 60, 12);
+  drawText(`Ammo produced: ${stats.ammoProduced}`, VIEW_W - 240, VIEW_H - 44, 12);
+  drawText(`Heavy ammo:    ${stats.heavyAmmoProduced || 0}`, VIEW_W - 240, VIEW_H - 28, 12);
+
+  // hint top-right
+  drawText("WASD | 1-9 select | 0/- rail/station | LMB/RMB | R rot | F save | L load | M map | G world | Esc", VIEW_W - 820, 12, 12);
+
+  // Minimap top-right (below the controls hint)
+  const mmW = 240, mmH = Math.round(mmW * H / W);
+  drawMapView(VIEW_W - mmW - 12, 80, mmW, mmH);
+
+  // Full map overlay
+  if (showMap) {
+    ctx.fillStyle = "rgba(0,0,0,0.6)";
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    let bigW = VIEW_W - 200;
+    let bigH = bigW * H / W;
+    if (bigH > VIEW_H - 120) { bigH = VIEW_H - 120; bigW = bigH * W / H; }
+    const mx = (VIEW_W - bigW) / 2, my = (VIEW_H - bigH) / 2;
+    bigMapRect = { x: mx, y: my, w: bigW, h: bigH };
+    drawMapView(mx, my, bigW, bigH, { bounds: computeFullMapBounds(), showLabels: true });
+    drawText("Press M to close — drag to pan, scroll to zoom (" + mapView.zoom.toFixed(2) + "x)", VIEW_W/2 - 220, my - 22, 14, "#ffd700");
+  } else {
+    bigMapRect = null;
+  }
+  if (toastTimer > 0) {
+    drawText(toastText, VIEW_W/2 - 60, 60, 16, "#ffd700");
+  }
+
+  if (paused && !gameOver) {
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    drawText("Paused — press Esc to resume", VIEW_W/2 - 160, VIEW_H/2 - 8, 16);
+  }
+  if (gameOver) {
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  }
+
+  if (worldGenOpen) {
+    ctx.fillStyle = "rgba(0,0,0,0.85)";
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    const bw = 900, bh = 640;
+    const bx = (VIEW_W - bw) / 2, by = (VIEW_H - bh) / 2;
+    ctx.fillStyle = "#161616";
+    ctx.fillRect(bx, by, bw, bh);
+    ctx.strokeStyle = COL.selected;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(bx, by, bw, bh);
+    drawText("Generate New World", bx + 24, by + 20, 16, "#ffd700");
+    // Settings on left
+    const sx0 = bx + 24, sy0 = by + 64;
+    drawText(`Patch count       : ${worldGenSettings.count}    [-/+]`, sx0, sy0, 16);
+    drawText(`Edge inset        : ${worldGenSettings.inset}    [ [ / ] ]`, sx0, sy0 + 28, 16);
+    drawText(`Min gap between   : ${worldGenSettings.gap}    [ , / . ]`, sx0, sy0 + 56, 16);
+    drawText(`Patches placed    : ${worldGenLastPlaced} / ${worldGenSettings.count}`, sx0, sy0 + 100, 12, "#bbb");
+    drawText("[Space] Reroll preview", sx0, sy0 + 132, 12, "#bbb");
+    drawText("[Enter] Generate world", sx0, sy0 + 152, 12, "#bbb");
+    drawText("[Esc]   Cancel", sx0, sy0 + 172, 12, "#bbb");
+    // Preview on right (always at initial-size aspect ratio)
+    const initB = getInitialBounds();
+    const initW = (initB.xMax - initB.xMin) * TILE;
+    const initH = (initB.yMax - initB.yMin) * TILE;
+    const pw = 520, ph = Math.round(pw * initH / initW);
+    const px2 = bx + bw - pw - 24;
+    const py2 = by + 64;
+    drawText("Preview", px2, py2 - 22, 12, "#bbb");
+    drawMapView(px2, py2, pw, ph, { oreGrid: worldGenPreview, showEntities: false, bounds: initB });
+    // Player spawn marker (center of initial bounds)
+    if (worldGenPreview) {
+      ctx.fillStyle = COL.player;
+      ctx.fillRect(px2 + pw/2 - 3, py2 + ph/2 - 3, 6, 6);
+    }
+    drawText("Player spawn (cream dot)", px2, py2 + ph + 8, 12, "#bbb");
+  }
+
+  if (pendingConfirm) {
+    ctx.fillStyle = "rgba(0,0,0,0.7)";
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    const bw = 460, bh = 160;
+    const bx = (VIEW_W - bw) / 2, by = (VIEW_H - bh) / 2;
+    ctx.fillStyle = "#1a1a1a";
+    ctx.fillRect(bx, by, bw, bh);
+    ctx.strokeStyle = COL.selected;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(bx, by, bw, bh);
+    let verb = "do this", detail = "";
+    if (pendingConfirm === "save") { verb = "save"; detail = "This will overwrite any existing save."; }
+    else if (pendingConfirm === "load") { verb = "load"; detail = "This will discard the current game."; }
+    else if (pendingConfirm === "newworld") { verb = "generate this world"; detail = "All buildings, ore, and progress will be lost."; }
+    drawText(`Are you sure you want to ${verb}?`, bx + 24, by + 24, 16);
+    drawText(detail, bx + 24, by + 60, 12, "#bbb");
+    drawText("[Y] Yes      [N] No", bx + 24, by + 110, 16, "#ffd700");
+  }
+}
+
+// ============================================================
+// Game Loop (fixed timestep accumulator)
+// ============================================================
+let lastTime = performance.now();
+let accumulator = 0;
+
+function update(dt) {
+  if (toastTimer > 0) toastTimer -= dt;
+  if (paused || gameOver) return;
+  tickPlayer(dt);
+  updateCamera();
+  handleClicks();
+  tickMiners(dt);
+  tickBigDrills(dt);
+  tickBelts(dt);
+  tickUndergroundBelts(dt);
+  tickSplitters(dt);
+  tickAssemblers(dt);
+  tickHeavyAssemblers(dt);
+  // Rebuild the per-frame zombie spatial grid so all the targeting/AOE queries below are O(local).
+  rebuildZombieGrid();
+  // Order: artillery → sniper → heavy → normal. Earlier turrets reduce z.hp first, and the
+  // others skip targets whose hp is already <= 0, so guns don't waste shots overlapping.
+  tickArtillery(dt);
+  tickShells(dt);
+  tickSniperTurrets(dt);
+  tickHeavyTurrets(dt);
+  tickTurrets(dt);
+  tickTrain(dt);
+  tickStation(dt);
+  tickPlayerBullets(dt);
+  tickZombies(dt);
+  tickWaves(dt, performance.now());
+}
+
+function render() {
+  ctx.clearRect(0, 0, VIEW_W, VIEW_H);
+  ctx.save();
+  ctx.translate(-Math.round(camX), -Math.round(camY));
+  drawGround();
+  // Multi-tile buildings appear once per occupied cell in the map; dedupe.
+  const seen = new Set();
+  for (const b of buildings.values()) {
+    if (seen.has(b)) continue;
+    seen.add(b);
+    drawBuilding(b);
+  }
+  drawTrain();
+  drawBlueprintOverlay();
+  drawBullets();
+  drawPlayerBullets();
+  drawShells();
+  drawExplosions();
+  drawZombies();
+  drawPlayer();
+  if (!gameOver && !paused) drawPlacementPreview();
+  if (!gameOver && !paused) drawRailToolPreview();
+  ctx.restore();
+  drawUI();
+}
+
+// Returns world-pixel position at a continuous progress along a list of tile-coord cells.
+// Progress 0 = first cell center, progress (cells.length - 1) = last cell center.
+function pathPositionAt(cells, progress) {
+  if (!cells || cells.length === 0) return { x: 0, y: 0 };
+  if (cells.length === 1) return { x: cells[0].x * TILE + TILE/2, y: cells[0].y * TILE + TILE/2 };
+  const clamped = Math.max(0, Math.min(cells.length - 1.0001, progress));
+  const idx = Math.floor(clamped);
+  const t = clamped - idx;
+  const a = cells[idx], b = cells[idx + 1];
+  return {
+    x: (a.x + (b.x - a.x) * t) * TILE + TILE/2,
+    y: (a.y + (b.y - a.y) * t) * TILE + TILE/2,
+  };
+}
+
+function drawBlueprintOverlay() {
+  if (blueprintCapture) {
+    const sx = blueprintCapture.start ? blueprintCapture.start.x : mouseTileX;
+    const sy = blueprintCapture.start ? blueprintCapture.start.y : mouseTileY;
+    const ex = mouseTileX, ey = mouseTileY;
+    const xLo = Math.min(sx, ex), xHi = Math.max(sx, ex);
+    const yLo = Math.min(sy, ey), yHi = Math.max(sy, ey);
+    ctx.fillStyle = "rgba(127, 200, 255, 0.18)";
+    ctx.fillRect(xLo * TILE, yLo * TILE, (xHi - xLo + 1) * TILE, (yHi - yLo + 1) * TILE);
+    ctx.strokeStyle = "#7fc8ff";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(xLo * TILE, yLo * TILE, (xHi - xLo + 1) * TILE, (yHi - yLo + 1) * TILE);
+  } else if (blueprintPlace) {
+    const ax = mouseTileX, ay = mouseTileY;
+    const ok = blueprintCanPlaceAt(blueprintPlace, ax, ay);
+    ctx.globalAlpha = 0.55;
+    for (const it of blueprintPlace.items) {
+      const cells = footprintCells(it.t, ax + it.dx, ay + it.dy, it.dir);
+      let xLo = Infinity, yLo = Infinity, xHi = -Infinity, yHi = -Infinity;
+      for (const c of cells) {
+        if (c.x < xLo) xLo = c.x;
+        if (c.y < yLo) yLo = c.y;
+        if (c.x > xHi) xHi = c.x;
+        if (c.y > yHi) yHi = c.y;
+      }
+      ctx.fillStyle = ok ? "rgba(127,255,127,0.35)" : "rgba(255,80,80,0.35)";
+      ctx.fillRect(xLo * TILE, yLo * TILE, (xHi - xLo + 1) * TILE, (yHi - yLo + 1) * TILE);
+    }
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = ok ? "#7fff7f" : "#ff5555";
+    ctx.lineWidth = 2;
+    let xLo = Infinity, yLo = Infinity, xHi = -Infinity, yHi = -Infinity;
+    for (const it of blueprintPlace.items) {
+      const cells = footprintCells(it.t, ax + it.dx, ay + it.dy, it.dir);
+      for (const c of cells) {
+        if (c.x < xLo) xLo = c.x;
+        if (c.y < yLo) yLo = c.y;
+        if (c.x > xHi) xHi = c.x;
+        if (c.y > yHi) yHi = c.y;
+      }
+    }
+    if (xLo !== Infinity) {
+      ctx.strokeRect(xLo * TILE, yLo * TILE, (xHi - xLo + 1) * TILE, (yHi - yLo + 1) * TILE);
+    }
+  }
+}
+
+function drawTrain() {
+  if (!train) return;
+  // Always use the train's current journey path so the parked-vs-moving transition is
+  // seamless. If we have no path yet (fresh game / load with no journey done), fall back
+  // to a synthetic station-axis path so the cars are positioned through the station.
+  let pathCells = train.pathCells;
+  let progress = train.pathProgress;
+  if (!pathCells || pathCells.length < 2) {
+    if (train.parkedStationIndex == null) return;
+    const s = stations[train.parkedStationIndex];
+    if (!s) return;
+    pathCells = stationCenterline(s);
+    progress = pathCells.length - 1;
+  }
+  if (!pathCells || pathCells.length < 2) return;
+
+  // Wheel offsets in tile units, measured back from the locomotive nose.
+  const locoFrontP = progress;
+  const locoBackP  = progress - LOCOMOTIVE_L;
+  const storFrontP = progress - LOCOMOTIVE_L - COUPLING_GAP;
+  const storBackP  = progress - LOCOMOTIVE_L - COUPLING_GAP - STORAGE_L;
+  const locoF = pathPositionAt(pathCells, locoFrontP);
+  const locoB = pathPositionAt(pathCells, locoBackP);
+  const storF = pathPositionAt(pathCells, storFrontP);
+  const storB = pathPositionAt(pathCells, storBackP);
+
+  // Coupling line between the inner pair of wheels.
+  ctx.strokeStyle = "#999";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(locoB.x, locoB.y);
+  ctx.lineTo(storF.x, storF.y);
+  ctx.stroke();
+
+  if (train.flipped) {
+    // Storage car at the lead pair, locomotive at the trail pair.
+    drawCarFromWheels(locoF, locoB, "#a87a44", false);
+    drawCarFromWheels(storF, storB, "#3a3a3a", true);
+  } else {
+    drawCarFromWheels(locoF, locoB, "#3a3a3a", true);
+    drawCarFromWheels(storF, storB, "#a87a44", false);
+  }
+}
+
+// Build a list of cells along a station's long axis from outer end → inner end.
+// "Inner end" is where the locomotive's nose stops. Step by 1 tile per entry to keep math simple.
+function stationCenterline(s) {
+  const cells = s.cells || [{ x: s.x, y: s.y }];
+  let xMinT = Infinity, yMinT = Infinity, xMaxT = -Infinity, yMaxT = -Infinity;
+  for (const c of cells) {
+    if (c.x < xMinT) xMinT = c.x;
+    if (c.y < yMinT) yMinT = c.y;
+    if (c.x > xMaxT) xMaxT = c.x;
+    if (c.y > yMaxT) yMaxT = c.y;
+  }
+  const horizontal = (xMaxT - xMinT) > (yMaxT - yMinT);
+  const path = [];
+  if (horizontal) {
+    const y = (yMinT + yMaxT) / 2;
+    for (let x = xMinT; x <= xMaxT; x++) path.push({ x, y });
+  } else {
+    const x = (xMinT + xMaxT) / 2;
+    for (let y = yMinT; y <= yMaxT; y++) path.push({ x, y });
+  }
+  return path;
+}
+
+// Draw a car as a rotated rectangle stretched between its two wheels.
+function drawCarFromWheels(wf, wb, color, isLocomotive) {
+  const dx = wf.x - wb.x, dy = wf.y - wb.y;
+  const length = Math.hypot(dx, dy);
+  if (length < 0.5) return;
+  const angle = Math.atan2(dy, dx);
+  const midx = (wf.x + wb.x) / 2;
+  const midy = (wf.y + wb.y) / 2;
+  ctx.save();
+  ctx.translate(midx, midy);
+  ctx.rotate(angle);
+  // shadow
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  ctx.fillRect(-length/2 + 2, -CAR_W_PX/2 + 3, length, CAR_W_PX);
+  // body
+  ctx.fillStyle = color;
+  ctx.fillRect(-length/2, -CAR_W_PX/2, length, CAR_W_PX);
+  ctx.strokeStyle = "#000";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(-length/2, -CAR_W_PX/2, length, CAR_W_PX);
+  if (isLocomotive) {
+    ctx.fillStyle = "#1a1a1a";
+    ctx.fillRect(length/2 - 10, -CAR_W_PX/2 + 3, 6, CAR_W_PX - 6);
+    ctx.fillStyle = "#ffeebb";
+    ctx.fillRect(length/2 - 3, -3, 4, 6);
+  } else {
+    const innerLen = length - 8;
+    ctx.fillStyle = "#222";
+    ctx.fillRect(-length/2 + 4, -3, innerLen, 6);
+    ctx.fillStyle = "#ffd700";
+    ctx.fillRect(-length/2 + 4, -3, innerLen * (train.inventory / TRAIN_INVENTORY_MAX), 6);
+  }
+  ctx.restore();
+  // Wheels: solid dark circles at each wheel position (drawn last so they sit on top).
+  ctx.fillStyle = "#0c0c0c";
+  ctx.beginPath(); ctx.arc(wf.x, wf.y, WHEEL_R, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(wb.x, wb.y, WHEEL_R, 0, Math.PI * 2); ctx.fill();
+}
+
+function drawRailToolPreview() {
+  if (selectedBuilding !== BTYPE.RAIL || !railToolStart) return;
+  if (!inBounds(mouseTileX, mouseTileY)) return;
+  const path = findRailPath(railToolStart, { x: mouseTileX, y: mouseTileY });
+  if (!path) {
+    ctx.fillStyle = "rgba(255,80,80,0.5)";
+    ctx.fillRect(railToolStart.x * TILE, railToolStart.y * TILE, TILE, TILE);
+    return;
+  }
+  ctx.fillStyle = "rgba(255, 215, 0, 0.35)";
+  for (const c of path) ctx.fillRect(c.x * TILE, c.y * TILE, TILE, TILE);
+}
+
+function loop(now) {
+  let frameTime = now - lastTime;
+  if (frameTime > 250) frameTime = 250;
+  lastTime = now;
+  accumulator += frameTime;
+  while (accumulator >= FIXED_DT) {
+    update(FIXED_DT);
+    accumulator -= FIXED_DT;
+  }
+  render();
+  requestAnimationFrame(loop);
+}
+updateCamera();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
