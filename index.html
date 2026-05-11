@@ -191,6 +191,19 @@ const PLAYER_MAX_HP = 100;
 const ZOMBIE_SPEED = 1.5 * TILE / 1000;
 const ZOMBIE_HP = 50;
 const ZOMBIE_DMG_PER_SEC = 10;
+// Zombie intelligence tiers: index = tier; tier T applies when waveNumber >= ZOMBIE_TIER_WAVES[T-1].
+// Each tier adds a speed multiplier and behavior changes (see tickZombies/nearestTarget).
+const ZOMBIE_TIER_WAVES   = [11, 25, 50, 100];
+const ZOMBIE_TIER_SPEED   = [1.0, 1.10, 1.25, 1.50, 2.0];
+const COVERAGE_RECOMPUTE_INTERVAL = 1500; // ms — how often coverage + weak-spot are refreshed
+const WEAK_SPOT_RADIUS_TILES = 18;        // search radius around the player for the weakest tile
+function zombieTierForWave(wn) {
+  let t = 0;
+  for (let i = 0; i < ZOMBIE_TIER_WAVES.length; i++) {
+    if (wn >= ZOMBIE_TIER_WAVES[i]) t = i + 1;
+  }
+  return t;
+}
 const PLAYER_DMG_PER_SEC = 10;
 // Player handgun (Space to fire toward the mouse cursor).
 const PLAYER_GUN_RELOAD = 2500;                       // ms between shots
@@ -264,6 +277,8 @@ let blueprintPlace = null;         // a blueprint object the player is placing
 let mapView = { centerX: 0, centerY: 0, zoom: 1 };
 let mapDrag = null; // { lastScreenX, lastScreenY }
 let bigMapRect = null; // { x, y, w, h } in canvas pixels — set each frame the map is drawn
+let showTurretRanges = true; // toggled by the in-map button
+let rangeBtnRect = null;     // { x, y, w, h } — set each frame the map is drawn
 let worldGenOpen = false;
 const worldGenSettings = { count: 8, inset: 12, gap: 4 };
 let worldGenPreview = null; // 2D array of ore counts
@@ -387,6 +402,11 @@ function computeFullMapBounds() {
 canvas.addEventListener("mousedown", (e) => {
   if (gameOver || paused) return;
   if (scheduleModalOpen) return;
+  // Toggle turret-range button on the M overlay.
+  if (showMap && e.button === 0 && pointInRect(mouseScreenX, mouseScreenY, rangeBtnRect)) {
+    showTurretRanges = !showTurretRanges;
+    return;
+  }
   // Map drag intercepts left-click while M overlay is open and the cursor is over the map.
   if (showMap && e.button === 0 && pointInRect(mouseScreenX, mouseScreenY, bigMapRect)) {
     mapDrag = { lastScreenX: mouseScreenX, lastScreenY: mouseScreenY };
@@ -1630,17 +1650,99 @@ function tickTurrets(dt) {
 // ============================================================
 const zombies = []; // {x,y,hp,dead,fade,attackCd}
 
-function nearestTarget(zx, zy) {
-  let best = { x: player.x, y: player.y, isPlayer: true, building: null };
-  let bestD = (player.x - zx)**2 + (player.y - zy)**2;
+// Set of "x,y" tile keys covered by at least one offensive turret (any of normal/heavy/sniper/artillery).
+// Recomputed every COVERAGE_RECOMPUTE_INTERVAL ms.
+let coverageTiles = new Set();
+let coverageRecomputeT = 0;
+let weakSpotWorld = null; // {x, y} world pixel — used by tier 3+ as the rush point
+
+function turretRangeFor(b) {
+  if (b.type === BTYPE.TURRET) return TURRET_RANGE;
+  if (b.type === BTYPE.HEAVY_TURRET) return TURRET_RANGE;
+  if (b.type === BTYPE.SNIPER_TURRET) return SNIPER_TURRET_RANGE;
+  if (b.type === BTYPE.ARTILLERY) return ARTILLERY_RANGE;
+  return 0;
+}
+function turretCenterFor(b) {
+  if (b.type === BTYPE.ARTILLERY) return { x: (b.x + 1.5) * TILE, y: (b.y + 1.5) * TILE };
+  return { x: b.x * TILE + TILE / 2, y: b.y * TILE + TILE / 2 };
+}
+
+function recomputeCoverage() {
+  coverageTiles = new Set();
   for (const b of uniqueBuildings) {
-    // Rails are passive track and produce many entries; zombies don't path to them.
-    if (b.type === BTYPE.RAIL) continue;
-    const bx = b.x * TILE + TILE/2, by = b.y * TILE + TILE/2;
-    const d = (bx - zx)**2 + (by - zy)**2;
-    if (d < bestD) { bestD = d; best = { x: bx, y: by, isPlayer: false, building: b }; }
+    const range = turretRangeFor(b);
+    if (range <= 0) continue;
+    const c = turretCenterFor(b);
+    const r2 = range * range;
+    const rTiles = Math.ceil(range / TILE);
+    const cTx = Math.floor(c.x / TILE), cTy = Math.floor(c.y / TILE);
+    for (let dy = -rTiles; dy <= rTiles; dy++) {
+      for (let dx = -rTiles; dx <= rTiles; dx++) {
+        const tx = cTx + dx, ty = cTy + dy;
+        const px = tx * TILE + TILE / 2, py = ty * TILE + TILE / 2;
+        const dxp = px - c.x, dyp = py - c.y;
+        if (dxp * dxp + dyp * dyp <= r2) coverageTiles.add(tx + "," + ty);
+      }
+    }
   }
-  return best;
+}
+function buildingCovered(b) { return coverageTiles.has(b.x + "," + b.y); }
+
+function recomputeWeakSpot() {
+  const px = Math.floor(player.x / TILE), py = Math.floor(player.y / TILE);
+  let best = null, bestScore = Infinity;
+  for (let dy = -WEAK_SPOT_RADIUS_TILES; dy <= WEAK_SPOT_RADIUS_TILES; dy++) {
+    for (let dx = -WEAK_SPOT_RADIUS_TILES; dx <= WEAK_SPOT_RADIUS_TILES; dx++) {
+      const tx = px + dx, ty = py + dy;
+      if (!inBounds(tx, ty)) continue;
+      const d2 = dx * dx + dy * dy;
+      if (d2 > WEAK_SPOT_RADIUS_TILES * WEAK_SPOT_RADIUS_TILES) continue;
+      // Score: heavily penalize being inside coverage, mildly prefer close to player.
+      const covered = coverageTiles.has(tx + "," + ty) ? 1 : 0;
+      const score = covered * 100000 + d2;
+      if (score < bestScore) {
+        bestScore = score;
+        best = { x: tx * TILE + TILE / 2, y: ty * TILE + TILE / 2 };
+      }
+    }
+  }
+  weakSpotWorld = best;
+}
+
+function nearestTarget(zx, zy, tier) {
+  tier = tier || 0;
+  // Tier 3+ : rush the weakest spot near the player (least turret coverage).
+  if (tier >= 3 && weakSpotWorld) {
+    return { x: weakSpotWorld.x, y: weakSpotWorld.y, isPlayer: false, building: null };
+  }
+  // Tier 1+ : prefer the closest building that's NOT inside any turret's range.
+  if (tier >= 1) {
+    let bestB = null, bestBD = Infinity;
+    for (const b of uniqueBuildings) {
+      if (b.type === BTYPE.RAIL) continue;
+      if (buildingCovered(b)) continue;
+      const bx = b.x * TILE + TILE / 2, by = b.y * TILE + TILE / 2;
+      const d = (bx - zx) ** 2 + (by - zy) ** 2;
+      if (d < bestBD) { bestBD = d; bestB = b; }
+    }
+    if (bestB) {
+      const bx = bestB.x * TILE + TILE / 2, by = bestB.y * TILE + TILE / 2;
+      return { x: bx, y: by, isPlayer: false, building: bestB };
+    }
+    // No uncovered building remains: group up toward the centroid of nearby zombies,
+    // unless the player is closer.
+    let sumX = 0, sumY = 0, n = 0;
+    forEachZombieInRadius(zx, zy, TILE * 12, (z2) => { sumX += z2.x; sumY += z2.y; n++; });
+    if (n > 1) {
+      const cx = sumX / n, cy = sumY / n;
+      const playerD2 = (player.x - zx) ** 2 + (player.y - zy) ** 2;
+      const groupD2 = (cx - zx) ** 2 + (cy - zy) ** 2;
+      if (groupD2 < playerD2) return { x: cx, y: cy, isPlayer: false, building: null };
+    }
+  }
+  // Default (Tier 0 and the tier-1+ fallback): bee-line straight for the player.
+  return { x: player.x, y: player.y, isPlayer: true, building: null };
 }
 
 // ============================================================
@@ -1695,23 +1797,52 @@ function tickZombies(dt) {
     let target = z.cachedTarget;
     const cachedBuildingDead = target && target.building && !uniqueBuildings.has(target.building);
     if (z.targetCacheT <= 0 || !target || cachedBuildingDead) {
-      target = nearestTarget(z.x, z.y);
+      target = nearestTarget(z.x, z.y, z.tier || 0);
       z.cachedTarget = target;
       z.targetCacheT = 800;
     }
-    // The cached target is a snapshot for buildings (still moves for the player).
+    // The cached target is a snapshot for buildings (still moves for the player and the weak spot).
     if (target.isPlayer) { target = { x: player.x, y: player.y, isPlayer: true, building: null }; }
+    else if ((z.tier || 0) >= 3 && !target.building && weakSpotWorld) {
+      target = { x: weakSpotWorld.x, y: weakSpotWorld.y, isPlayer: false, building: null };
+    }
     const dx = target.x - z.x, dy = target.y - z.y;
     const dist = Math.hypot(dx, dy);
     const meleeRange = TILE * 0.8;
     if (dist > meleeRange) {
       const sp = z.speed || ZOMBIE_SPEED;
-      const vx = dx / dist * sp * dt;
-      const vy = dy / dist * sp * dt;
+      let vx = dx / dist * sp * dt;
+      let vy = dy / dist * sp * dt;
       // Simple collision: don't enter solid building tiles (walls/buildings except current target's building)
-      const newX = z.x + vx, newY = z.y + vy;
-      const tx = Math.floor(newX / TILE), ty = Math.floor(newY / TILE);
-      const occ = buildingAt(tx, ty);
+      let newX = z.x + vx, newY = z.y + vy;
+      let tx = Math.floor(newX / TILE), ty = Math.floor(newY / TILE);
+      let occ = buildingAt(tx, ty);
+      // Tier 2+ zombies sidestep walls — if blocked, try a perpendicular slide that gets them
+      // around the obstacle without attacking it. Walls only; other buildings remain attackable targets.
+      if (occ && occ.type === BTYPE.WALL && (z.tier || 0) >= 2) {
+        const perpAx = -vy, perpAy = vx;   // 90° CCW
+        const perpBx =  vy, perpBy = -vx;  // 90° CW
+        const tryCandidate = (px, py) => {
+          const cx = z.x + px, cy = z.y + py;
+          const ctx = Math.floor(cx / TILE), cty = Math.floor(cy / TILE);
+          const c = buildingAt(ctx, cty);
+          return (!c || c === target.building) ? { x: cx, y: cy } : null;
+        };
+        const tryA = tryCandidate(perpAx, perpAy);
+        const tryB = tryCandidate(perpBx, perpBy);
+        let pick = null;
+        if (tryA && tryB) {
+          // pick the side that gets us closer to the target
+          const dA = (tryA.x - target.x) ** 2 + (tryA.y - target.y) ** 2;
+          const dB = (tryB.x - target.x) ** 2 + (tryB.y - target.y) ** 2;
+          pick = dA < dB ? tryA : tryB;
+        } else pick = tryA || tryB;
+        if (pick) {
+          newX = pick.x; newY = pick.y;
+          tx = Math.floor(newX / TILE); ty = Math.floor(newY / TILE);
+          occ = buildingAt(tx, ty);
+        }
+      }
       if (!occ || (target.building && occ === target.building)) {
         z.x = newX; z.y = newY;
       } else {
@@ -1832,6 +1963,7 @@ function spawnZombieAt(x, y, opts) {
     bob: Math.random() * Math.PI * 2,
     speed: opts.speed || ZOMBIE_SPEED,
     isBoss: !!opts.isBoss,
+    tier: opts.tier || 0,
   });
 }
 
@@ -1891,7 +2023,14 @@ function tickWaves(dt, now) {
     while (waveState.spawned < waveState.spawnCount && waveState.spawnTimer >= waveState.spawnInterval) {
       waveState.spawnTimer -= waveState.spawnInterval;
       const p = randomEdgeSpawnPoint();
-      spawnZombieAt(p.x, p.y, waveState.bossWave ? { isBoss: true, speed: ZOMBIE_SPEED * 2 } : null);
+      const tier = zombieTierForWave(waveState.waveNumber);
+      const tierMult = ZOMBIE_TIER_SPEED[tier];
+      const bossMult = waveState.bossWave ? 2 : 1;
+      spawnZombieAt(p.x, p.y, {
+        isBoss: waveState.bossWave,
+        speed: ZOMBIE_SPEED * tierMult * bossMult,
+        tier,
+      });
       waveState.spawned++;
     }
     if (waveState.spawned >= waveState.spawnCount) waveState.spawning = false;
@@ -1965,6 +2104,7 @@ function saveGame() {
       ac: z.attackCd || 0,
       sp: z.speed || ZOMBIE_SPEED,
       bs: z.isBoss ? 1 : 0,
+      tr: z.tier || 0,
     })),
   };
   try {
@@ -2067,6 +2207,7 @@ function loadGame() {
         bob: Math.random() * Math.PI * 2,
         speed: z.sp || ZOMBIE_SPEED,
         isBoss: !!z.bs,
+        tier: z.tr || 0,
       });
     }
   }
@@ -3024,6 +3165,12 @@ function drawZombies() {
       ctx.strokeStyle = "#ff7777";
       ctx.lineWidth = 1.5;
       ctx.stroke();
+    } else if (!z.dead && (z.tier || 0) > 0) {
+      // Smarter zombies get a thin colored outline (orange → red as tier rises).
+      const tierColors = ["", "#ffa040", "#ff6020", "#ff3030", "#ff00a0"];
+      ctx.strokeStyle = tierColors[Math.min(4, z.tier)];
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
     }
     ctx.fillStyle = COL.zombieEye;
     ctx.fillRect(z.x - 4, z.y - 2 + bobY, 2, 2);
@@ -3316,8 +3463,8 @@ function drawMapView(mx, my, mw, mh, opts) {
   }
   ctx.globalAlpha = 1;
 
-  // Turret range circles — only on the full map (where labels are on) so the minimap stays clean.
-  if (opts.showLabels) {
+  // Turret range circles — only on the full map and only when the toggle is on.
+  if (opts.showLabels && opts.showRanges) {
     for (const b of bSeen) {
       let range = 0, minRange = 0, color = null;
       let bcx = b.x, bcy = b.y; // tile-coord center of turret
@@ -3711,10 +3858,22 @@ function drawUI() {
     if (bigH > VIEW_H - 120) { bigH = VIEW_H - 120; bigW = bigH * W / H; }
     const mx = (VIEW_W - bigW) / 2, my = (VIEW_H - bigH) / 2;
     bigMapRect = { x: mx, y: my, w: bigW, h: bigH };
-    drawMapView(mx, my, bigW, bigH, { bounds: computeFullMapBounds(), showLabels: true });
+    drawMapView(mx, my, bigW, bigH, { bounds: computeFullMapBounds(), showLabels: true, showRanges: showTurretRanges });
     drawText("Press M to close — drag to pan, scroll to zoom (" + mapView.zoom.toFixed(2) + "x)", VIEW_W/2 - 220, my - 22, 14, "#ffd700");
+    // "Ranges: ON/OFF" toggle button, drawn just above the top-right corner of the map.
+    const btnW = 140, btnH = 26;
+    const btnX = mx + bigW - btnW;
+    const btnY = my - btnH - 4;
+    rangeBtnRect = { x: btnX, y: btnY, w: btnW, h: btnH };
+    ctx.fillStyle = showTurretRanges ? "#3a3a14" : "#1a1a1a";
+    ctx.fillRect(btnX, btnY, btnW, btnH);
+    ctx.strokeStyle = showTurretRanges ? "#ffd700" : "#777";
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(btnX, btnY, btnW, btnH);
+    drawText("Ranges: " + (showTurretRanges ? "ON" : "OFF"), btnX + 12, btnY + 7, 14, showTurretRanges ? "#ffd700" : "#bbb");
   } else {
     bigMapRect = null;
+    rangeBtnRect = null;
   }
   if (toastTimer > 0) {
     drawText(toastText, VIEW_W/2 - 60, 60, 16, "#ffd700");
@@ -3808,6 +3967,13 @@ function update(dt) {
   tickHeavyAssemblers(dt);
   // Rebuild the per-frame zombie spatial grid so all the targeting/AOE queries below are O(local).
   rebuildZombieGrid();
+  // Periodically refresh turret coverage + weak-spot for tier-1+ zombies.
+  coverageRecomputeT -= dt;
+  if (coverageRecomputeT <= 0) {
+    recomputeCoverage();
+    recomputeWeakSpot();
+    coverageRecomputeT = COVERAGE_RECOMPUTE_INTERVAL;
+  }
   // Order: artillery → sniper → heavy → normal. Earlier turrets reduce z.hp first, and the
   // others skip targets whose hp is already <= 0, so guns don't waste shots overlapping.
   tickArtillery(dt);
