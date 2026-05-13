@@ -60,6 +60,98 @@
   #blueprintModal .actions { display: flex; gap: 8px; justify-content: flex-end; }
   #blueprintModal button { padding: 6px 14px; background: #ffd700; color: #000; border: none; cursor: pointer; font-family: inherit; font-weight: bold; }
   #blueprintModal button.secondary { background: #555; color: #fff; }
+  #mainMenu { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+              background: #141414; color: #fff; font-family: ui-monospace, Consolas, monospace; z-index: 200; }
+  #mainMenu.hidden { display: none; }
+  #mainMenu .panel { background: #1c1c1c; padding: 36px 56px; border: 2px solid #ffd700; text-align: center; }
+  #mainMenu h1 { color: #ffd700; margin: 0 0 24px 0; font-size: 40px; letter-spacing: 2px; }
+  #mainMenu button.big { display: block; width: 220px; margin: 10px auto; padding: 12px;
+                         background: #ffd700; color: #000; border: none; font-size: 18px; cursor: pointer;
+                         font-family: inherit; font-weight: bold; }
+  #mainMenu button.big:hover { background: #ffea66; }
+  #saveListModal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+                   background: rgba(0,0,0,0.7); z-index: 210; }
+  #saveListModal.open { display: flex; }
+  #saveListModal .panel { background: #1a1a1a; border: 2px solid #ffd700; padding: 20px 24px;
+                          color: #fff; font-family: ui-monospace, Consolas, monospace; min-width: 420px;
+                          max-width: 600px; }
+  #saveListModal h3 { margin: 0 0 12px 0; color: #ffd700; }
+  #saveListUl { list-style: none; padding: 0; margin: 0 0 8px 0; max-height: 280px; overflow-y: auto; }
+  #saveListUl li { display: flex; gap: 6px; margin: 4px 0; }
+  #saveListUl li button.slLoad { flex: 1; text-align: left; padding: 6px 10px; background: #2a2a2a;
+                                  color: #fff; border: 1px solid #555; cursor: pointer; font-family: inherit; }
+  #saveListUl li button.slLoad:hover { background: #3a3a3a; }
+  #saveListUl li button.slDel { padding: 6px 10px; background: #5a2424; color: #fff; border: none;
+                                cursor: pointer; font-family: inherit; }
+  #saveListUl li button.slDel:hover { background: #7a3030; }
+  #saveListUl li button.slRename { padding: 6px 10px; background: #244a5a; color: #fff; border: none;
+                                   cursor: pointer; font-family: inherit; }
+  #saveListUl li button.slRename:hover { background: #306a7a; }
+  #saveListUl li input.slEdit { flex: 1; background: #2a2a2a; color: #fff; border: 1px solid #ffd700;
+                                padding: 6px; font-family: inherit; }
+  #saveListUl li button.slOk { background: #2a5a2a; color: #fff; }
+  #saveListUl li button.slOk:hover { background: #3a7a3a; }
+  #saveListUl .empty { color: #888; padding: 4px 0; }
+  #saveListModal .row { display: flex; gap: 6px; margin: 8px 0; align-items: center; }
+  #saveListModal input { flex: 1; background: #2a2a2a; color: #fff; border: 1px solid #555; padding: 6px;
+                         font-family: inherit; }
+  #saveListModal .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+  #saveListModal button { padding: 6px 14px; background: #ffd700; color: #000; border: none;
+                          cursor: pointer; font-family: inherit; font-weight: bold; }
+  #saveListModal button.secondary { background: #555; color: #fff; }
+  #difficultyModal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+                     background: rgba(0,0,0,0.85); z-index: 220; }
+  #difficultyModal.open { display: flex; }
+  #difficultyModal .panel { background: #1a1a1a; border: 2px solid #ffd700; padding: 24px 28px;
+                            color: #fff; font-family: ui-monospace, Consolas, monospace; min-width: 540px;
+                            max-width: 720px; }
+  #difficultyModal h3 { margin: 0 0 16px 0; color: #ffd700; font-size: 22px; }
+  #diffList { list-style: none; padding: 0; margin: 0 0 12px 0; }
+  #diffList li { display: flex; gap: 10px; align-items: center; margin: 6px 0; }
+  #diffList li button.diffPick { flex: 1; text-align: left; padding: 10px 14px; background: #2a2a2a;
+                                 color: #fff; border: 1px solid #555; cursor: pointer; font-family: inherit; }
+  #diffList li button.diffPick:hover { background: #3a3a3a; border-color: #ffd700; }
+  #diffList li .diffName { color: #ffd700; font-weight: bold; font-size: 15px; }
+  #diffList li .diffDesc { color: #bbb; font-size: 12px; margin-top: 3px; display: block; }
+  #difficultyModal button { padding: 6px 14px; background: #ffd700; color: #000; border: none;
+                            cursor: pointer; font-family: inherit; font-weight: bold; }
+  #difficultyModal button.secondary { background: #555; color: #fff; }
+  #difficultyModal .actions { display: flex; gap: 8px; justify-content: flex-end; }
+  #winOverlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+                background: rgba(0,0,0,0.75); z-index: 215; }
+  #winOverlay.open { display: flex; }
+  #winOverlay .panel { background: #1a1a1a; border: 3px solid #ffd700; padding: 28px 40px;
+                       color: #fff; font-family: ui-monospace, Consolas, monospace; text-align: center;
+                       min-width: 360px; }
+  #winOverlay h2 { color: #ffd700; margin: 0 0 12px 0; font-size: 28px; letter-spacing: 1px; }
+  #winOverlay p { margin: 8px 0 18px 0; color: #ccc; }
+  #winOverlay .actions { display: flex; gap: 10px; justify-content: center; }
+  #winOverlay button { padding: 10px 18px; background: #ffd700; color: #000; border: none;
+                       cursor: pointer; font-family: inherit; font-weight: bold; font-size: 15px; }
+  #winOverlay button.secondary { background: #555; color: #fff; }
+  #pauseMenu { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+               background: rgba(0,0,0,0.7); z-index: 205; }
+  #pauseMenu.open { display: flex; }
+  #pauseMenu .panel { display: none; background: #1a1a1a; border: 2px solid #ffd700;
+                      padding: 24px 32px; color: #fff;
+                      font-family: ui-monospace, Consolas, monospace; min-width: 320px; text-align: center; }
+  #pauseMenu.scr-main #pmMainPanel { display: block; }
+  #pauseMenu.scr-settings #pmSettingsPanel { display: block; }
+  #pauseMenu.scr-confirm #pmConfirmPanel { display: block; }
+  #pauseMenu h2 { color: #ffd700; margin: 0 0 18px 0; font-size: 28px; letter-spacing: 1px; }
+  #pauseMenu h3 { color: #ffd700; margin: 0 0 12px 0; }
+  #pauseMenu p  { margin: 0 0 18px 0; color: #ccc; }
+  #pauseMenu button.big { display: block; width: 220px; margin: 8px auto; padding: 11px;
+                           background: #ffd700; color: #000; border: none; font-size: 16px;
+                           cursor: pointer; font-family: inherit; font-weight: bold; }
+  #pauseMenu button.big:hover { background: #ffea66; }
+  #pauseMenu button { padding: 8px 16px; background: #ffd700; color: #000; border: none;
+                      cursor: pointer; font-family: inherit; font-weight: bold; }
+  #pauseMenu button.secondary { background: #555; color: #fff; }
+  #pauseMenu .actions { display: flex; gap: 8px; justify-content: center; margin-top: 12px; }
+  #pauseMenu .settingRow { display: flex; align-items: center; gap: 10px; padding: 8px 0;
+                            font-size: 14px; color: #eee; }
+  #pauseMenu .settingRow input[type=checkbox] { accent-color: #ffd700; transform: scale(1.2); }
 </style>
 </head>
 <body>
@@ -93,6 +185,11 @@
   <div class="panel">
     <h3>Blueprints</h3>
     <ul id="blueprintList"></ul>
+    <div class="row" style="display:flex; gap:6px; align-items:center; margin: 8px 0 12px 0;">
+      <label style="width:60px">Name</label>
+      <input type="text" id="bpNameInput" placeholder="Blueprint name"
+             style="flex:1; background:#2a2a2a; color:#fff; border:1px solid #555; padding:6px; font-family:inherit">
+    </div>
     <div class="actions">
       <button class="secondary" id="bpCloseBtn" type="button">Close</button>
       <button id="bpCreateBtn" type="button">Create new</button>
@@ -100,6 +197,72 @@
   </div>
 </div>
 <div id="overlay"></div>
+<div id="mainMenu">
+  <div class="panel">
+    <h1>Factory Defense</h1>
+    <button class="big" id="mmNewBtn">New Game</button>
+    <button class="big" id="mmLoadBtn">Load Game</button>
+    <button class="big" id="mmExitBtn">Exit</button>
+  </div>
+</div>
+<div id="pauseMenu">
+  <div class="panel pmMain" id="pmMainPanel">
+    <h2>Paused</h2>
+    <button class="big" id="pmResumeBtn" type="button">Resume</button>
+    <button class="big" id="pmSettingsBtn" type="button">Settings</button>
+    <button class="big" id="pmMainMenuBtn" type="button">Main Menu</button>
+  </div>
+  <div class="panel pmSet" id="pmSettingsPanel">
+    <h3>Settings</h3>
+    <label class="settingRow">
+      <input type="checkbox" id="setShowRangesChk">
+      Show turret ranges on map
+    </label>
+    <div class="actions">
+      <button class="secondary" id="pmSettingsBackBtn" type="button">Back</button>
+    </div>
+  </div>
+  <div class="panel pmConf" id="pmConfirmPanel">
+    <h3>Return to main menu?</h3>
+    <p>Any unsaved progress will be lost.</p>
+    <div class="actions">
+      <button class="secondary" id="pmConfirmCancelBtn" type="button">Cancel</button>
+      <button id="pmConfirmYesBtn" type="button">Yes, return</button>
+    </div>
+  </div>
+</div>
+<div id="difficultyModal">
+  <div class="panel">
+    <h3>Choose Difficulty</h3>
+    <ul id="diffList"></ul>
+    <div class="actions">
+      <button class="secondary" id="diffBackBtn" type="button">Back</button>
+    </div>
+  </div>
+</div>
+<div id="winOverlay">
+  <div class="panel">
+    <h2>You won!</h2>
+    <p id="winSubtitle"></p>
+    <div class="actions">
+      <button id="winContinueBtn" type="button">Continue</button>
+      <button class="secondary" id="winMenuBtn" type="button">Main menu</button>
+    </div>
+  </div>
+</div>
+<div id="saveListModal">
+  <div class="panel">
+    <h3 id="slmTitle">Load Game</h3>
+    <ul id="saveListUl"></ul>
+    <div class="row" id="slmSaveRow" style="display:none">
+      <input type="text" id="slmNameInput" placeholder="Save name">
+      <button id="slmSaveBtn" type="button">Save</button>
+    </div>
+    <div class="actions">
+      <button class="secondary" id="slmCloseBtn" type="button">Close</button>
+    </div>
+  </div>
+</div>
 <script>
 "use strict";
 
@@ -153,7 +316,7 @@ const WHEEL_R = 3.5;
 const COUPLING_GAP = 0.4;  // tile units between locomotive back wheel and storage car front wheel
 const TRAIN_OUTPUT_INTERVAL = 100; // ms between unload transfers
 const MAX_STATIONS = 2;
-const SNIPER_TURRET_UNLOCK_WAVE = 10;
+let SNIPER_TURRET_UNLOCK_WAVE = 10;
 const SNIPER_TURRET_RANGE = 12 * TILE * 5; // 5x normal turret
 const SNIPER_TURRET_INTERVAL = 1000;
 const SNIPER_TURRET_DMG = 9999; // one-shot
@@ -179,7 +342,7 @@ const SHELL_ORE_COST = 10;
 const ASSEMBLER_HEAVY_BUF_MAX = 12;
 const UNDERGROUND_BELT_RANGE = 5;
 const ITEM = { ORE:1, AMMO:2, HEAVY_AMMO:3, SHELL:4 };
-const HEAVY_TURRET_UNLOCK_WAVE = 10;
+let HEAVY_TURRET_UNLOCK_WAVE = 10;
 const HEAVY_TURRET_AMMO_MAX = 50;
 const HEAVY_TURRET_INTERVAL = 100; // 10 bullets/sec sustained
 const HEAVY_TURRET_DMG_PER_BULLET = 12; // ~0.5x normal turret's 25
@@ -263,6 +426,104 @@ let placementDir = DIR.RIGHT;
 let selectedBuilding = BTYPE.MINER;
 let paused = false;
 let gameOver = false;
+let inMenu = true; // shown at startup; cleared by main-menu "New" / "Load" buttons
+// Difficulty presets. Each modifies zombie speed, count, ore patch density, turret unlock
+// timing, boss-wave size/speed, and the win-wave threshold.
+const DIFFICULTIES = {
+  superEasy: {
+    name: "Super Easy",
+    desc: "Zombies 0.5× speed, 2× ore. Turrets unlock at wave 5. Win at wave 25. Bosses 0.5× speed & size; total ×0.25 zombies.",
+    zombieSpeedMult: 0.5,
+    orePatchMult: 2,
+    winWave: 25,
+    turretsUnlock: 5,
+    bossSpeedMod: 0.5,
+    bossSizeMod: 0.5,
+    zombieCountMult: 0.25,
+  },
+  easy: {
+    name: "Easy",
+    desc: "Zombies 0.75× speed, 1.5× ore. Turrets unlock at wave 7. Win at wave 50. Bosses /1.5 speed & size; total ×0.5 zombies.",
+    zombieSpeedMult: 0.75,
+    orePatchMult: 1.5,
+    winWave: 50,
+    turretsUnlock: 7,
+    bossSpeedMod: 1 / 1.5,
+    bossSizeMod: 1 / 1.5,
+    zombieCountMult: 0.5,
+  },
+  normal: {
+    name: "Normal",
+    desc: "Default. Turrets unlock at wave 10. Win at wave 100.",
+    zombieSpeedMult: 1,
+    orePatchMult: 1,
+    winWave: 100,
+    turretsUnlock: 10,
+    bossSpeedMod: 1,
+    bossSizeMod: 1,
+    zombieCountMult: 1,
+  },
+  hard: {
+    name: "Hard",
+    desc: "Zombies 1.5× speed, 0.75× ore. Turrets unlock at wave 25. Win at wave 100. Bosses 1.5× speed & size; total ×2 zombies.",
+    zombieSpeedMult: 1.5,
+    orePatchMult: 0.75,
+    winWave: 100,
+    turretsUnlock: 25,
+    bossSpeedMod: 1.5,
+    bossSizeMod: 1.5,
+    zombieCountMult: 2,
+  },
+  impossible: {
+    name: "Impossible",
+    desc: "Zombies 2× speed, 0.5× ore. Turrets unlock at wave 25. Win at wave 150. Bosses 2× speed & size; total ×3 zombies.",
+    zombieSpeedMult: 2,
+    orePatchMult: 0.5,
+    winWave: 150,
+    turretsUnlock: 25,
+    bossSpeedMod: 2,
+    bossSizeMod: 2,
+    zombieCountMult: 3,
+  },
+  impossiblePlus: {
+    name: "Impossible+",
+    desc: "Zombies 2× speed, 0.25× ore. Turrets unlock at wave 25. Win at wave 200. Bosses 3× speed & size; total ×5 zombies.",
+    zombieSpeedMult: 2,
+    orePatchMult: 0.25,
+    winWave: 200,
+    turretsUnlock: 25,
+    bossSpeedMod: 3,
+    bossSizeMod: 3,
+    zombieCountMult: 5,
+  },
+  impossiblePlusPlus: {
+    name: "Impossible++",
+    desc: "Zombies 2× speed, 2 patches of ore. Turrets unlock at wave 25. Win at wave 250. Bosses 5× speed & size; total ×10 zombies. Cap raised to 5000.",
+    zombieSpeedMult: 2,
+    orePatchMult: 0.25,    // → ~2 patches (round(8 × 0.25) = 2)
+    winWave: 250,
+    turretsUnlock: 25,
+    bossSpeedMod: 5,
+    bossSizeMod: 5,
+    zombieCountMult: 10,
+    normalCap: 5000,
+    bossCap: 5000,
+  },
+};
+const DIFFICULTY_ORDER = ["superEasy", "easy", "normal", "hard", "impossible", "impossiblePlus", "impossiblePlusPlus"];
+let difficulty = DIFFICULTIES.normal;
+let difficultyKey = "normal";
+let pendingWin = false;       // true once the player has reached winWave; shows the win overlay
+let winAcknowledged = false;  // set after the player chooses Continue (suppresses re-showing)
+
+function applyDifficulty(key) {
+  if (!DIFFICULTIES[key]) key = "normal";
+  difficultyKey = key;
+  difficulty = DIFFICULTIES[key];
+  HEAVY_TURRET_UNLOCK_WAVE = difficulty.turretsUnlock;
+  SNIPER_TURRET_UNLOCK_WAVE = difficulty.turretsUnlock;
+  ORE_PATCH_COUNT = Math.max(1, Math.round(8 * difficulty.orePatchMult));
+}
 let showMap = false;
 let pendingConfirm = null; // null | "save" | "load" | "newworld"
 let railToolStart = null; // { x, y } first-click tile when laying rail
@@ -273,6 +534,7 @@ let blueprints = [];               // [{ name, items: [{ t, dx, dy, dir }] }]
 let blueprintModalOpen = false;
 let blueprintCapture = null;       // { name, start: {x,y}|null }
 let blueprintPlace = null;         // a blueprint object the player is placing
+let blueprintRotation = 0;         // 0–3 (90° CW per step) applied while placing
 // Full-map pan/zoom state (only used when showMap is true).
 let mapView = { centerX: 0, centerY: 0, zoom: 1 };
 let mapDrag = null; // { lastScreenX, lastScreenY }
@@ -289,6 +551,9 @@ ctx.imageSmoothingEnabled = false;
 
 window.addEventListener("keydown", (e) => {
   if (gameOver) return;
+  // Ignore game hotkeys while typing into a DOM input (e.g. blueprint name).
+  const ae = document.activeElement;
+  if (ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA")) return;
   const k = e.key.toLowerCase();
   keys[k] = true;
   // Confirm dialog intercepts input while open
@@ -330,10 +595,13 @@ window.addEventListener("keydown", (e) => {
   else if (k === "=") { if (waveState.waveNumber >= ARTILLERY_UNLOCK_WAVE) selectedBuilding = BTYPE.ARTILLERY; else showToast("Artillery unlocks at wave " + ARTILLERY_UNLOCK_WAVE); }
   else if (k === "[") { if (waveState.waveNumber >= ARTILLERY_UNLOCK_WAVE) selectedBuilding = BTYPE.HEAVY_ASSEMBLER; else showToast("Heavy assembler unlocks at wave " + ARTILLERY_UNLOCK_WAVE); }
   else if (k === "]") { if (waveState.waveNumber >= BIG_DRILL_UNLOCK_WAVE) selectedBuilding = BTYPE.BIG_DRILL; else showToast("Big drill unlocks at wave " + BIG_DRILL_UNLOCK_WAVE); }
-  else if (k === "r") placementDir = (placementDir + 1) % 4;
-  else if (k === "escape") paused = !paused;
-  else if (k === "f") pendingConfirm = "save";
-  else if (k === "l") pendingConfirm = "load";
+  else if (k === "r") {
+    if (blueprintPlace) blueprintRotation = (blueprintRotation + 1) % 4;
+    else placementDir = (placementDir + 1) % 4;
+  }
+  else if (k === "escape") togglePauseMenu();
+  else if (k === "f") { if (!inMenu) openSaveList("save"); }
+  else if (k === "l") openSaveList("load");
   else if (k === "m") {
     showMap = !showMap;
     if (showMap) {
@@ -477,7 +745,7 @@ function clearAllOre() { ore.fill(0); }
 
 function inBounds(x, y) { return x >= xMin && y >= yMin && x < xMax && y < yMax; }
 
-const ORE_PATCH_COUNT = 8;
+let ORE_PATCH_COUNT = 8;
 const ORE_EDGE_INSET = 12;
 const ORE_PATCH_GAP = 4;
 
@@ -628,8 +896,14 @@ function applyNewWorld() {
   shells.length = 0;
   explosions.length = 0;
   setInitialActiveBounds();
-  if (worldGenPreview) ore.set(worldGenPreview);
-  else clearAllOre();
+  if (worldGenPreview) {
+    // G-dialog preview takes precedence.
+    ore.set(worldGenPreview);
+  } else {
+    // No preview → generate fresh patches using the current difficulty's ORE_PATCH_COUNT.
+    clearAllOre();
+    generateOrePatches();
+  }
   // Reset player to active region center
   player.x = (xMin + xMax) / 2 * TILE;
   player.y = (yMin + yMax) / 2 * TILE;
@@ -1378,7 +1652,10 @@ function tickMiners(dt) {
     if (oreAt(b.x, b.y) <= 0) { depleted.push(b); continue; }
     b.cooldown -= dt;
     if (b.cooldown <= 0) {
-      if (tryOutputAny(b, ITEM.ORE)) {
+      // Output strictly in the facing direction — never sideways or backward.
+      const nx = b.x + DX[b.dir], ny = b.y + DY[b.dir];
+      const next = buildingAt(nx, ny);
+      if (tryAccept(next, ITEM.ORE, b.dir)) {
         const cur = oreAt(b.x, b.y);
         setOre(b.x, b.y, cur > 0 ? cur - 1 : 0);
         stats.oreMined++;
@@ -1508,8 +1785,26 @@ function tickArtillery(dt) {
     }
     const haveTarget = (b.cachedTargetCount || 0) > 0;
     const bestX = b.cachedTargetX, bestY = b.cachedTargetY;
+    // Lead the target: zombies bee-line at the player at ZOMBIE_SPEED, and our shell
+    // is slow (30 tiles/sec). Predict where the cluster will be when the shell arrives.
+    // Two iterations is enough to converge for a stationary player.
+    let aimX = bestX, aimY = bestY;
+    if (haveTarget) {
+      const tdx = player.x - bestX, tdy = player.y - bestY;
+      const tdist = Math.hypot(tdx, tdy);
+      if (tdist > 0.1) {
+        const vx = (tdx / tdist) * ZOMBIE_SPEED;
+        const vy = (tdy / tdist) * ZOMBIE_SPEED;
+        for (let iter = 0; iter < 2; iter++) {
+          const fdist = Math.hypot(aimX - cx, aimY - cy);
+          const flightTime = fdist / ARTILLERY_SHELL_SPEED;
+          aimX = bestX + vx * flightTime;
+          aimY = bestY + vy * flightTime;
+        }
+      }
+    }
     let aimed = false;
-    if (haveTarget) aimed = turnBarrel(b, Math.atan2(bestY - cy, bestX - cx), ARTILLERY_TURN_RATE, dt);
+    if (haveTarget) aimed = turnBarrel(b, Math.atan2(aimY - cy, aimX - cx), ARTILLERY_TURN_RATE, dt);
     b.cooldown -= dt;
     // Don't fire while our previous shell is still in flight.
     if (b.cooldown <= 0 && haveTarget && aimed && (b.ammo || 0) > 0 && !b.activeShell) {
@@ -1517,13 +1812,13 @@ function tickArtillery(dt) {
       const muzzleDist = TILE * 4;
       const mx = cx + Math.cos(b.barrelAngle) * muzzleDist;
       const my = cy + Math.sin(b.barrelAngle) * muzzleDist;
-      const dx = bestX - mx, dy = bestY - my;
+      const dx = aimX - mx, dy = aimY - my;
       const dist = Math.hypot(dx, dy) || 1;
       const shell = {
         x: mx, y: my,
         vx: dx / dist * ARTILLERY_SHELL_SPEED,
         vy: dy / dist * ARTILLERY_SHELL_SPEED,
-        tx: bestX, ty: bestY,
+        tx: aimX, ty: aimY,
         owner: b,
       };
       shells.push(shell);
@@ -1757,33 +2052,8 @@ function recomputeWeakSpot() {
   weakSpotWorld = best;
 }
 
-function nearestTarget(zx, zy, tier) {
-  tier = tier || 0;
-  // Tier 3+ : rush the weakest spot near the player (least turret coverage).
-  if (tier >= 3 && weakSpotWorld) {
-    return { x: weakSpotWorld.x, y: weakSpotWorld.y, isPlayer: false, building: null };
-  }
-  // Tier 1+ : prefer the closest building that's NOT inside any turret's range.
-  if (tier >= 1) {
-    let bestB = null, bestBD = Infinity;
-    for (const b of uniqueBuildings) {
-      if (b.type === BTYPE.RAIL) continue;
-      if (buildingCovered(b)) continue;
-      const bx = b.x * TILE + TILE / 2, by = b.y * TILE + TILE / 2;
-      const d = (bx - zx) ** 2 + (by - zy) ** 2;
-      if (d < bestBD) { bestBD = d; bestB = b; }
-    }
-    if (bestB) {
-      const bx = bestB.x * TILE + TILE / 2, by = bestB.y * TILE + TILE / 2;
-      return { x: bx, y: by, isPlayer: false, building: bestB };
-    }
-    // No uncovered building remains: join the global swarm rally point, which is itself
-    // migrating toward the player while detouring around turret coverage.
-    if (swarmX !== null) {
-      return { x: swarmX, y: swarmY, isPlayer: false, building: null };
-    }
-  }
-  // Default (Tier 0 and the tier-1+ fallback): bee-line straight for the player.
+function nearestTarget(zx, zy) {
+  // Zombies always bee-line for the player. Buildings in the way get attacked on contact.
   return { x: player.x, y: player.y, isPlayer: true, building: null };
 }
 
@@ -1832,74 +2102,21 @@ function tickZombies(dt) {
       z.fade -= dt;
       continue;
     }
-    // Reuse the cached target for ~800 ms; recompute when expired or when the building it
-    // pointed at no longer exists. Massive cost reduction for large zombie counts.
-    if (!("targetCacheT" in z)) z.targetCacheT = 0;
-    z.targetCacheT -= dt;
-    let target = z.cachedTarget;
-    const cachedBuildingDead = target && target.building && !uniqueBuildings.has(target.building);
-    if (z.targetCacheT <= 0 || !target || cachedBuildingDead) {
-      target = nearestTarget(z.x, z.y, z.tier || 0);
-      z.cachedTarget = target;
-      z.targetCacheT = 800;
-    }
-    // The cached target is a snapshot of {x, y} for fixed-building targets, but swarm/weak-spot/
-    // player targets must read the CURRENT live coords each tick or the zombie will stop at a
-    // stale point and never catch up to the moving rally.
-    if (target.isPlayer) {
-      target = { x: player.x, y: player.y, isPlayer: true, building: null };
-    } else if (!target.building) {
-      if ((z.tier || 0) >= 3 && weakSpotWorld) {
-        target = { x: weakSpotWorld.x, y: weakSpotWorld.y, isPlayer: false, building: null };
-      } else if (swarmX !== null) {
-        target = { x: swarmX, y: swarmY, isPlayer: false, building: null };
-      }
-    }
+    const target = { x: player.x, y: player.y, isPlayer: true, building: null };
     const dx = target.x - z.x, dy = target.y - z.y;
     const dist = Math.hypot(dx, dy);
     const meleeRange = TILE * 0.8;
     if (dist > meleeRange) {
       const sp = z.speed || ZOMBIE_SPEED;
-      let vx = dx / dist * sp * dt;
-      let vy = dy / dist * sp * dt;
-      // Simple collision: don't enter solid building tiles (walls/buildings except current target's building)
-      let newX = z.x + vx, newY = z.y + vy;
-      let tx = Math.floor(newX / TILE), ty = Math.floor(newY / TILE);
-      let occ = buildingAt(tx, ty);
-      // Sidestep logic. Two reasons to deviate from a straight line:
-      //   • Tier 2+ : walls block our step → try a perpendicular slide around them.
-      //   • Tier 1+ : we'd be entering turret coverage from outside → slide along the edge.
-      const zTier = z.tier || 0;
-      const inCovNow = coverageTiles.has(Math.floor(z.x / TILE) + "," + Math.floor(z.y / TILE));
-      const enteringCov = coverageTiles.has(tx + "," + ty) && !inCovNow;
-      const blockingWall = occ && occ.type === BTYPE.WALL;
-      const wantSidestep = (blockingWall && zTier >= 2) || (enteringCov && zTier >= 1);
-      if (wantSidestep) {
-        const perpAx = -vy, perpAy = vx;   // 90° CCW
-        const perpBx =  vy, perpBy = -vx;  // 90° CW
-        const tryCandidate = (px, py) => {
-          const cx = z.x + px, cy = z.y + py;
-          const ctx = Math.floor(cx / TILE), cty = Math.floor(cy / TILE);
-          const c = buildingAt(ctx, cty);
-          if (c && c.type === BTYPE.WALL && c !== target.building) return null;
-          if (enteringCov && coverageTiles.has(ctx + "," + cty)) return null;
-          return { x: cx, y: cy };
-        };
-        const tryA = tryCandidate(perpAx, perpAy);
-        const tryB = tryCandidate(perpBx, perpBy);
-        let pick = null;
-        if (tryA && tryB) {
-          const dA = (tryA.x - target.x) ** 2 + (tryA.y - target.y) ** 2;
-          const dB = (tryB.x - target.x) ** 2 + (tryB.y - target.y) ** 2;
-          pick = dA < dB ? tryA : tryB;
-        } else pick = tryA || tryB;
-        if (pick) {
-          newX = pick.x; newY = pick.y;
-          tx = Math.floor(newX / TILE); ty = Math.floor(newY / TILE);
-          occ = buildingAt(tx, ty);
-        }
-      }
-      if (!occ || (target.building && occ === target.building)) {
+      const vx = dx / dist * sp * dt;
+      const vy = dy / dist * sp * dt;
+      // Simple collision: don't enter solid building tiles; attack what blocks the path.
+      const newX = z.x + vx, newY = z.y + vy;
+      const tx = Math.floor(newX / TILE), ty = Math.floor(newY / TILE);
+      const occ = buildingAt(tx, ty);
+      // Rails and stations are walkable — zombies don't destroy them, they pass over.
+      const isWalkthrough = occ && (occ.type === BTYPE.RAIL || occ.type === BTYPE.STATION);
+      if (!occ || isWalkthrough || (target.building && occ === target.building)) {
         z.x = newX; z.y = newY;
       } else {
         // attack the blocking building
@@ -2054,9 +2271,19 @@ function startWave(now) {
   waveState.bossWave = isBoss;
   let count = 5 + waveState.waveNumber * 3;
   if (isBoss) count *= 4; // 4x zombies on boss waves
+  // Difficulty multipliers: blanket count multiplier + boss-size mod stack on top.
+  count *= difficulty.zombieCountMult;
+  if (isBoss) count *= difficulty.bossSizeMod;
+  count = Math.max(1, Math.round(count));
   // Hard caps: normal waves cap at 500 zombies, boss waves cap at 2000.
-  count = Math.min(count, isBoss ? 2000 : 500);
+  // Difficulties can override (e.g. Impossible++ uses 5000/5000).
+  const normalCap = difficulty.normalCap || 500;
+  const bossCap = difficulty.bossCap || 2000;
+  count = Math.min(count, isBoss ? bossCap : normalCap);
   waveState.spawnCount = count;
+  // Win trigger: once the player just started the difficulty's target wave, queue the win
+  // overlay. Won't re-show after they hit Continue.
+  if (!winAcknowledged && waveState.waveNumber >= difficulty.winWave) pendingWin = true;
   waveState.spawned = 0;
   waveState.spawnTimer = 0;
   // 4x more zombies in the same window = 4x spawn rate naturally.
@@ -2079,14 +2306,12 @@ function tickWaves(dt, now) {
     while (waveState.spawned < waveState.spawnCount && waveState.spawnTimer >= waveState.spawnInterval) {
       waveState.spawnTimer -= waveState.spawnInterval;
       const p = randomEdgeSpawnPoint();
-      const tier = zombieTierForWave(waveState.waveNumber);
-      const tierMult = ZOMBIE_TIER_SPEED[tier];
-      const bossMult = waveState.bossWave ? 2 : 1;
-      spawnZombieAt(p.x, p.y, {
-        isBoss: waveState.bossWave,
-        speed: ZOMBIE_SPEED * tierMult * bossMult,
-        tier,
-      });
+      const baseSpeed = ZOMBIE_SPEED * difficulty.zombieSpeedMult;
+      if (waveState.bossWave) {
+        spawnZombieAt(p.x, p.y, { isBoss: true, speed: baseSpeed * 2 * difficulty.bossSpeedMod });
+      } else {
+        spawnZombieAt(p.x, p.y, { speed: baseSpeed });
+      }
       waveState.spawned++;
     }
     if (waveState.spawned >= waveState.spawnCount) waveState.spawning = false;
@@ -2108,8 +2333,8 @@ let toastText = "";
 let toastTimer = 0;
 function showToast(msg) { toastText = msg; toastTimer = 2000; }
 
-function saveGame() {
-  if (gameOver) return;
+// Build the JSON-serializable snapshot of the current game state.
+function buildSaveData() {
   const oreData = [];
   // Iterate the active region only — outside that range ore can never be set.
   for (let y = yMin; y < yMax; y++) {
@@ -2132,7 +2357,7 @@ function saveGame() {
       nm: b.name || undefined,
     });
   }
-  const data = {
+  return {
     ore: oreData,
     buildings: bData,
     player: { x: player.x, y: player.y, hp: player.hp, facing: player.facing },
@@ -2154,6 +2379,8 @@ function saveGame() {
       fl: train.flipped ? 1 : 0,
     } : null,
     blueprints: blueprints,
+    difficulty: difficultyKey,
+    winAcknowledged: winAcknowledged ? 1 : 0,
     // Persist live zombies so a save mid-wave restores the in-progress fight.
     zombies: zombies.filter(z => !z.dead).map(z => ({
       x: z.x, y: z.y, hp: z.hp,
@@ -2163,19 +2390,18 @@ function saveGame() {
       tr: z.tier || 0,
     })),
   };
-  try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
-    showToast("Game saved");
-  } catch (e) {
-    showToast("Save failed");
-  }
 }
 
-function loadGame() {
-  const raw = localStorage.getItem(SAVE_KEY);
-  if (!raw) { showToast("No save found"); return; }
-  let data;
-  try { data = JSON.parse(raw); } catch (e) { showToast("Save corrupted"); return; }
+function saveGame() { saveCurrentToSlot("quicksave"); }
+function loadGame() { loadSaveByName("quicksave"); }
+
+function applySaveData(data) {
+  // Restore difficulty BEFORE building placement so wave-gated unlocks use the right thresholds.
+  applyDifficulty(data.difficulty || "normal");
+  winAcknowledged = !!data.winAcknowledged;
+  pendingWin = false;
+  inMenu = false;
+  mainMenuEl.classList.add("hidden");
   // Clear world
   clearAllOre();
   buildings.clear();
@@ -2272,7 +2498,6 @@ function loadGame() {
     gameOver = false;
     document.getElementById("overlay").innerHTML = "";
   }
-  showToast("Game loaded");
 }
 
 // ============================================================
@@ -3221,12 +3446,6 @@ function drawZombies() {
       ctx.strokeStyle = "#ff7777";
       ctx.lineWidth = 1.5;
       ctx.stroke();
-    } else if (!z.dead && (z.tier || 0) > 0) {
-      // Smarter zombies get a thin colored outline (orange → red as tier rises).
-      const tierColors = ["", "#ffa040", "#ff6020", "#ff3030", "#ff00a0"];
-      ctx.strokeStyle = tierColors[Math.min(4, z.tier)];
-      ctx.lineWidth = 1.2;
-      ctx.stroke();
     }
     ctx.fillStyle = COL.zombieEye;
     ctx.fillRect(z.x - 4, z.y - 2 + bobY, 2, 2);
@@ -3709,9 +3928,11 @@ const blueprintModal = document.getElementById("blueprintModal");
 const blueprintList = document.getElementById("blueprintList");
 const bpCloseBtn = document.getElementById("bpCloseBtn");
 const bpCreateBtn = document.getElementById("bpCreateBtn");
+const bpNameInput = document.getElementById("bpNameInput");
 
 function openBlueprintModal() {
   if (blueprintCapture || blueprintPlace) return;
+  bpNameInput.value = "Blueprint " + (blueprints.length + 1);
   blueprintList.innerHTML = "";
   if (blueprints.length === 0) {
     const div = document.createElement("div");
@@ -3725,7 +3946,7 @@ function openBlueprintModal() {
       name.className = "bpName";
       const sz = blueprints[i].items.length;
       name.textContent = blueprints[i].name + " (" + sz + " bldg" + (sz === 1 ? "" : "s") + ")";
-      name.onclick = () => { blueprintPlace = blueprints[i]; closeBlueprintModal(); showToast("Click to place. B/right-click to cancel."); };
+      name.onclick = () => { blueprintPlace = blueprints[i]; blueprintRotation = 0; closeBlueprintModal(); showToast("Click to place. R rotates. B/right-click cancels."); };
       const del = document.createElement("button");
       del.className = "bpDel";
       del.textContent = "x";
@@ -3742,12 +3963,293 @@ function closeBlueprintModal() {
   blueprintModalOpen = false;
 }
 bpCloseBtn.addEventListener("click", closeBlueprintModal);
-bpCreateBtn.addEventListener("click", () => {
-  const name = (typeof prompt === "function" ? (prompt("Blueprint name?", "Blueprint " + (blueprints.length + 1)) || "") : "").trim();
-  if (!name) return;
+function startBlueprintCapture() {
+  const name = (bpNameInput.value || "").trim() || ("Blueprint " + (blueprints.length + 1));
   blueprintCapture = { name, start: null };
   closeBlueprintModal();
   showToast("Click 1st corner of capture area");
+}
+bpCreateBtn.addEventListener("click", startBlueprintCapture);
+bpNameInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); startBlueprintCapture(); }
+});
+
+// ============================================================
+// Main menu + multi-slot save list
+// ============================================================
+const SAVE_PREFIX = "factoryDefenseSave_v2::";
+const mainMenuEl = document.getElementById("mainMenu");
+const mmNewBtn = document.getElementById("mmNewBtn");
+const mmLoadBtn = document.getElementById("mmLoadBtn");
+const mmExitBtn = document.getElementById("mmExitBtn");
+const saveListModal = document.getElementById("saveListModal");
+const saveListUl = document.getElementById("saveListUl");
+const slmTitle = document.getElementById("slmTitle");
+const slmSaveRow = document.getElementById("slmSaveRow");
+const slmNameInput = document.getElementById("slmNameInput");
+const slmSaveBtn = document.getElementById("slmSaveBtn");
+const slmCloseBtn = document.getElementById("slmCloseBtn");
+let slmMode = "load"; // "load" or "save"
+
+function listSaveSlots() {
+  const out = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith(SAVE_PREFIX)) out.push(k.slice(SAVE_PREFIX.length));
+  }
+  return out.sort();
+}
+
+function refreshSaveList() {
+  saveListUl.innerHTML = "";
+  const saves = listSaveSlots();
+  if (saves.length === 0) {
+    const div = document.createElement("div");
+    div.className = "empty";
+    div.textContent = "(no saved games)";
+    saveListUl.appendChild(div);
+    return;
+  }
+  for (const name of saves) {
+    const li = document.createElement("li");
+    const btn = document.createElement("button");
+    btn.className = "slLoad";
+    btn.textContent = name;
+    btn.onclick = () => {
+      if (slmMode === "save") {
+        startOverwriteConfirm(li, name);
+      } else {
+        loadSaveByName(name);
+        closeSaveList();
+        inMenu = false;
+        mainMenuEl.classList.add("hidden");
+      }
+    };
+    const renameBtn = document.createElement("button");
+    renameBtn.className = "slRename";
+    renameBtn.textContent = "✎";
+    renameBtn.title = "Rename";
+    renameBtn.onclick = () => startRenameSlot(li, name);
+    const del = document.createElement("button");
+    del.className = "slDel";
+    del.textContent = "x";
+    del.onclick = () => {
+      localStorage.removeItem(SAVE_PREFIX + name);
+      refreshSaveList();
+    };
+    li.appendChild(btn); li.appendChild(renameBtn); li.appendChild(del);
+    saveListUl.appendChild(li);
+  }
+}
+
+function startOverwriteConfirm(li, name) {
+  li.innerHTML = "";
+  const label = document.createElement("span");
+  label.style.flex = "1";
+  label.style.padding = "6px 10px";
+  label.style.color = "#ffd700";
+  label.style.fontFamily = "inherit";
+  label.textContent = "Overwrite \"" + name + "\"?";
+  const yes = document.createElement("button");
+  yes.className = "slOk";
+  yes.textContent = "✓";
+  yes.title = "Overwrite";
+  yes.onclick = () => {
+    saveCurrentToSlot(name);
+    closeSaveList();
+  };
+  const no = document.createElement("button");
+  no.className = "slDel";
+  no.textContent = "×";
+  no.title = "Cancel";
+  no.onclick = () => refreshSaveList();
+  li.appendChild(label); li.appendChild(yes); li.appendChild(no);
+}
+
+function startRenameSlot(li, oldName) {
+  li.innerHTML = "";
+  const input = document.createElement("input");
+  input.className = "slEdit";
+  input.type = "text";
+  input.value = oldName;
+  const ok = document.createElement("button");
+  ok.className = "slOk";
+  ok.textContent = "✓";
+  ok.title = "Save name";
+  const cancel = document.createElement("button");
+  cancel.className = "slDel";
+  cancel.textContent = "×";
+  cancel.title = "Cancel";
+  const commit = () => {
+    const newName = (input.value || "").trim();
+    if (!newName || newName === oldName) { refreshSaveList(); return; }
+    if (localStorage.getItem(SAVE_PREFIX + newName)) {
+      showToast("Name already in use");
+      return;
+    }
+    const data = localStorage.getItem(SAVE_PREFIX + oldName);
+    if (!data) { refreshSaveList(); return; }
+    localStorage.setItem(SAVE_PREFIX + newName, data);
+    localStorage.removeItem(SAVE_PREFIX + oldName);
+    showToast("Renamed to \"" + newName + "\"");
+    refreshSaveList();
+  };
+  ok.onclick = commit;
+  cancel.onclick = () => refreshSaveList();
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); commit(); }
+    else if (e.key === "Escape") { e.preventDefault(); refreshSaveList(); }
+  });
+  li.appendChild(input); li.appendChild(ok); li.appendChild(cancel);
+  setTimeout(() => { input.focus(); input.select(); }, 0);
+}
+
+function openSaveList(mode) {
+  slmMode = mode;
+  slmTitle.textContent = mode === "save" ? "Save Game" : "Load Game";
+  slmSaveRow.style.display = mode === "save" ? "flex" : "none";
+  if (mode === "save") {
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    slmNameInput.value = "save-" + stamp;
+  }
+  refreshSaveList();
+  saveListModal.classList.add("open");
+}
+function closeSaveList() { saveListModal.classList.remove("open"); }
+slmCloseBtn.addEventListener("click", closeSaveList);
+function saveCurrentToSlot(name) {
+  if (!name) return;
+  try {
+    const data = buildSaveData();
+    localStorage.setItem(SAVE_PREFIX + name, JSON.stringify(data));
+    showToast("Saved \"" + name + "\"");
+  } catch (e) { showToast("Save failed"); }
+}
+function loadSaveByName(name) {
+  const raw = localStorage.getItem(SAVE_PREFIX + name);
+  if (!raw) { showToast("Save not found"); return; }
+  let data;
+  try { data = JSON.parse(raw); }
+  catch (e) {
+    console.error("Save corrupted:", e, "raw start:", raw.slice(0, 200));
+    showToast("Save corrupted: " + (e && e.message ? e.message : "JSON parse error"));
+    return;
+  }
+  applySaveData(data);
+  showToast("Loaded \"" + name + "\"");
+}
+slmSaveBtn.addEventListener("click", () => {
+  const name = (slmNameInput.value || "").trim();
+  if (!name) return;
+  saveCurrentToSlot(name);
+  closeSaveList();
+});
+slmNameInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); slmSaveBtn.click(); }
+});
+
+// Pause menu DOM bindings + state.
+const pauseMenuEl = document.getElementById("pauseMenu");
+const pmResumeBtn = document.getElementById("pmResumeBtn");
+const pmSettingsBtn = document.getElementById("pmSettingsBtn");
+const pmMainMenuBtn = document.getElementById("pmMainMenuBtn");
+const pmSettingsBackBtn = document.getElementById("pmSettingsBackBtn");
+const pmConfirmCancelBtn = document.getElementById("pmConfirmCancelBtn");
+const pmConfirmYesBtn = document.getElementById("pmConfirmYesBtn");
+const setShowRangesChk = document.getElementById("setShowRangesChk");
+let pauseScreen = "main"; // "main" | "settings" | "confirm"
+
+function updatePauseUI() {
+  pauseMenuEl.classList.remove("open", "scr-main", "scr-settings", "scr-confirm");
+  if (paused) {
+    pauseMenuEl.classList.add("open", "scr-" + pauseScreen);
+    setShowRangesChk.checked = !!showTurretRanges;
+  }
+}
+function togglePauseMenu() {
+  if (inMenu) return; // ESC does nothing on the main menu
+  if (paused && (pauseScreen === "settings" || pauseScreen === "confirm")) {
+    pauseScreen = "main";
+  } else {
+    paused = !paused;
+    pauseScreen = "main";
+  }
+  updatePauseUI();
+}
+pmResumeBtn.addEventListener("click", () => { paused = false; updatePauseUI(); });
+pmSettingsBtn.addEventListener("click", () => { pauseScreen = "settings"; updatePauseUI(); });
+pmMainMenuBtn.addEventListener("click", () => { pauseScreen = "confirm"; updatePauseUI(); });
+pmSettingsBackBtn.addEventListener("click", () => { pauseScreen = "main"; updatePauseUI(); });
+pmConfirmCancelBtn.addEventListener("click", () => { pauseScreen = "main"; updatePauseUI(); });
+pmConfirmYesBtn.addEventListener("click", () => {
+  paused = false;
+  inMenu = true;
+  mainMenuEl.classList.remove("hidden");
+  updatePauseUI();
+});
+setShowRangesChk.addEventListener("change", (e) => { showTurretRanges = !!e.target.checked; });
+
+// Difficulty modal DOM bindings.
+const difficultyModal = document.getElementById("difficultyModal");
+const diffListEl = document.getElementById("diffList");
+const diffBackBtn = document.getElementById("diffBackBtn");
+
+function openDifficultyModal() {
+  diffListEl.innerHTML = "";
+  for (const key of DIFFICULTY_ORDER) {
+    const d = DIFFICULTIES[key];
+    const li = document.createElement("li");
+    const btn = document.createElement("button");
+    btn.className = "diffPick";
+    btn.innerHTML = '<span class="diffName">' + d.name + '</span>'
+                  + '<span class="diffDesc">' + d.desc + '</span>';
+    btn.onclick = () => startNewGameWithDifficulty(key);
+    li.appendChild(btn);
+    diffListEl.appendChild(li);
+  }
+  difficultyModal.classList.add("open");
+}
+function closeDifficultyModal() { difficultyModal.classList.remove("open"); }
+diffBackBtn.addEventListener("click", closeDifficultyModal);
+
+function startNewGameWithDifficulty(key) {
+  applyDifficulty(key);
+  pendingWin = false;
+  winAcknowledged = false;
+  applyNewWorld();
+  inMenu = false;
+  mainMenuEl.classList.add("hidden");
+  closeDifficultyModal();
+}
+
+// Win-overlay DOM bindings.
+const winOverlay = document.getElementById("winOverlay");
+const winContinueBtn = document.getElementById("winContinueBtn");
+const winMenuBtn = document.getElementById("winMenuBtn");
+const winSubtitle = document.getElementById("winSubtitle");
+winContinueBtn.addEventListener("click", () => {
+  winOverlay.classList.remove("open");
+  pendingWin = false;
+  winAcknowledged = true;
+});
+winMenuBtn.addEventListener("click", () => {
+  winOverlay.classList.remove("open");
+  pendingWin = false;
+  winAcknowledged = true;
+  inMenu = true;
+  mainMenuEl.classList.remove("hidden");
+});
+
+// Main menu button handlers.
+mmNewBtn.addEventListener("click", () => openDifficultyModal());
+mmLoadBtn.addEventListener("click", () => openSaveList("load"));
+mmExitBtn.addEventListener("click", () => {
+  // Electron: closes the window. Browser: window.close() is usually a no-op on pages the
+  // script didn't open, so we fall back to a goodbye screen.
+  try { window.close(); } catch (e) {}
+  setTimeout(() => {
+    document.body.innerHTML = '<div style="color:#ffd700; padding:60px; font-family:ui-monospace, Consolas, monospace; font-size:20px; text-align:center;">Game closed — you can close this tab.</div>';
+  }, 50);
 });
 
 // Capture all unique buildings whose anchor cell is inside the [x0..x1, y0..y1] rect.
@@ -3769,9 +4271,32 @@ function buildBlueprintFromRect(x0, y0, x1, y1, name) {
   return { name, items };
 }
 
+// Returns a copy of the blueprint's items, rotated CW by `rotation` 90° steps and
+// re-normalized so the new bounding-box top-left is at (0, 0). Uses footprintCells so
+// multi-tile buildings (stations, artilleries, etc.) rotate as a whole, not just their anchor.
+function rotateBlueprintItems(items, rotation) {
+  rotation = ((rotation % 4) + 4) % 4;
+  const rotated = items.map(it => {
+    let dx = it.dx, dy = it.dy;
+    for (let i = 0; i < rotation; i++) { const ndx = -dy, ndy = dx; dx = ndx; dy = ndy; }
+    return { t: it.t, dx, dy, dir: (it.dir + rotation) % 4 };
+  });
+  let minDx = Infinity, minDy = Infinity;
+  for (const it of rotated) {
+    const cells = footprintCells(it.t, it.dx, it.dy, it.dir);
+    for (const c of cells) {
+      if (c.x < minDx) minDx = c.x;
+      if (c.y < minDy) minDy = c.y;
+    }
+  }
+  if (Number.isFinite(minDx)) for (const it of rotated) { it.dx -= minDx; it.dy -= minDy; }
+  return rotated;
+}
+
 // Returns true if all blueprint items fit in-bounds at the given anchor.
 function blueprintCanPlaceAt(bp, ax, ay) {
-  for (const it of bp.items) {
+  const items = rotateBlueprintItems(bp.items, blueprintRotation);
+  for (const it of items) {
     const cells = footprintCells(it.t, ax + it.dx, ay + it.dy, it.dir);
     for (const c of cells) {
       if (!inBounds(c.x, c.y)) return false;
@@ -3782,8 +4307,9 @@ function blueprintCanPlaceAt(bp, ax, ay) {
 }
 
 function placeBlueprintAt(bp, ax, ay) {
+  const items = rotateBlueprintItems(bp.items, blueprintRotation);
   let placed = 0;
-  for (const it of bp.items) {
+  for (const it of items) {
     if (placeBuilding(it.t, ax + it.dx, ay + it.dy, it.dir)) placed++;
   }
   return placed;
@@ -3935,11 +4461,7 @@ function drawUI() {
     drawText(toastText, VIEW_W/2 - 60, 60, 16, "#ffd700");
   }
 
-  if (paused && !gameOver) {
-    ctx.fillStyle = "rgba(0,0,0,0.55)";
-    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
-    drawText("Paused — press Esc to resume", VIEW_W/2 - 160, VIEW_H/2 - 8, 16);
-  }
+  // (Pause menu is a DOM overlay — see #pauseMenu.)
   if (gameOver) {
     ctx.fillStyle = "rgba(0,0,0,0.55)";
     ctx.fillRect(0, 0, VIEW_W, VIEW_H);
@@ -4010,6 +4532,11 @@ let accumulator = 0;
 
 function update(dt) {
   if (toastTimer > 0) toastTimer -= dt;
+  if (inMenu) return;
+  if (pendingWin && !winOverlay.classList.contains("open")) {
+    winSubtitle.textContent = "You reached wave " + difficulty.winWave + " on " + difficulty.name + "!";
+    winOverlay.classList.add("open");
+  }
   if (paused || gameOver) return;
   tickPlayer(dt);
   updateCamera();
@@ -4023,14 +4550,6 @@ function update(dt) {
   tickHeavyAssemblers(dt);
   // Rebuild the per-frame zombie spatial grid so all the targeting/AOE queries below are O(local).
   rebuildZombieGrid();
-  // Periodically refresh turret coverage + weak-spot for tier-1+ zombies.
-  coverageRecomputeT -= dt;
-  if (coverageRecomputeT <= 0) {
-    recomputeCoverage();
-    recomputeWeakSpot();
-    recomputeSwarm();
-    coverageRecomputeT = COVERAGE_RECOMPUTE_INTERVAL;
-  }
   // Order: artillery → sniper → heavy → normal. Earlier turrets reduce z.hp first, and the
   // others skip targets whose hp is already <= 0, so guns don't waste shots overlapping.
   tickArtillery(dt);
@@ -4101,8 +4620,9 @@ function drawBlueprintOverlay() {
   } else if (blueprintPlace) {
     const ax = mouseTileX, ay = mouseTileY;
     const ok = blueprintCanPlaceAt(blueprintPlace, ax, ay);
+    const items = rotateBlueprintItems(blueprintPlace.items, blueprintRotation);
     ctx.globalAlpha = 0.55;
-    for (const it of blueprintPlace.items) {
+    for (const it of items) {
       const cells = footprintCells(it.t, ax + it.dx, ay + it.dy, it.dir);
       let xLo = Infinity, yLo = Infinity, xHi = -Infinity, yHi = -Infinity;
       for (const c of cells) {
@@ -4118,7 +4638,7 @@ function drawBlueprintOverlay() {
     ctx.strokeStyle = ok ? "#7fff7f" : "#ff5555";
     ctx.lineWidth = 2;
     let xLo = Infinity, yLo = Infinity, xHi = -Infinity, yHi = -Infinity;
-    for (const it of blueprintPlace.items) {
+    for (const it of items) {
       const cells = footprintCells(it.t, ax + it.dx, ay + it.dy, it.dir);
       for (const c of cells) {
         if (c.x < xLo) xLo = c.x;
